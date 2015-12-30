@@ -1,27 +1,30 @@
-package com.herscher.cribbage;
+package com.herscher.cribbage.scoring;
 
 import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
+
+import com.herscher.cribbage.Card;
+import com.herscher.cribbage.RulesViolationException;
+import com.herscher.cribbage.ScoreUnit;
 
 import java.util.ArrayList;
 import java.util.List;
 
 /**
  * TODO add comments
+ *
  * PlayScoringProcessor
  * PlayScorer
  *
  */
-public class StandardPlayScoringProcessor
+public class PlayScoreProcessor
 {
-	private final static int MAX_CARD_TOTAL = 31;
+	private final static int MAX_COUNT = 31;
 
 	private final List<Card> playedCards;
 	private final PlayScorer[] scorers;
-	private Player player;
-	private int total;
+	private int count;
 
-	public StandardPlayScoringProcessor(PlayScorer[] scorers)
+	public PlayScoreProcessor(PlayScorer[] scorers)
 	{
 		this.scorers = scorers;
 		playedCards = new ArrayList<>();
@@ -35,7 +38,7 @@ public class StandardPlayScoringProcessor
 		}
 
 		playedCards.add(card);
-		total += getValue(card);
+		count += getValue(card);
 
 		List<ScoreUnit> scores = new ArrayList<>();
 
@@ -52,24 +55,19 @@ public class StandardPlayScoringProcessor
 		return scores.toArray(new ScoreUnit[scores.size()]);
 	}
 
-	public void setPlayer(@NonNull Player player)
-	{
-		this.player = player;
-	}
-
 	public boolean isCardLegalToPlay(@NonNull Card card)
 	{
-		return getValue(card) + total <= MAX_CARD_TOTAL;
+		return getValue(card) + count <= MAX_COUNT;
 	}
 
-	public int getTotal()
+	public int getCount()
 	{
-		return total;
+		return count;
 	}
 
 	public void reset()
 	{
-		total = 0;
+		count = 0;
 		playedCards.clear();
 	}
 

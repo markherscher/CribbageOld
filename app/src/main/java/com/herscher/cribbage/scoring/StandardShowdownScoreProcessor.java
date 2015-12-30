@@ -1,4 +1,7 @@
-package com.herscher.cribbage;
+package com.herscher.cribbage.scoring;
+
+import com.herscher.cribbage.Card;
+import com.herscher.cribbage.ScoreUnit;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -9,7 +12,7 @@ import java.util.List;
  * TODO: score knobs
  * TODO: score flipping over a jack
  */
-public class StandardShowdownScorer implements ShowdownScoringProcessor
+public class StandardShowdownScoreProcessor implements ShowdownScoreProcessor
 {
 	@Override
 	public ScoreUnit[] calculateScore(List<Card> cards, Card cutCard)

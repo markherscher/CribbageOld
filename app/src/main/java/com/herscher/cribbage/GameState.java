@@ -19,7 +19,7 @@ public class GameState
 		COMPLETED
 	}
 
-	private final Player[] players;
+	private final List<Player> players;
 	private final CardCollection crib;
 	private final List<Card> allCards;
 	private CardCollection remainingDeck;
@@ -30,50 +30,79 @@ public class GameState
 
 	public GameState(@NonNull Player[] players)
 	{
-		this.players = new Player[players.length];
+		this.players = new ArrayList<>();
 		crib = new CardCollection();
 		allCards = CardDeckFactory.get52CardDeck();
 		state = State.DISCARD;
 
-		System.arraycopy(players, 0, this.players, 0, players.length);
+		for (Player p : players)
+		{
+			this.players.add(p);
+		}
 	}
 
-	public Player[] getPlayers()
+	public List<Player> getPlayers()
 	{
 		return players;
 	}
 
-	public void startNewRound()
+	public CardCollection getCrib()
 	{
-		// TODO: change active player
-		state = State.DISCARD;
-
-		for (Player p : players)
-		{
-			p.getDiscardedCards().clear();
-			p.getHand().clear();
-		}
+		return crib;
 	}
 
-	public void discardCards(Player player, Card[] cards)
+	public List<Card> getAllCards()
 	{
-		for (Player p : players)
-		{
-			if (p.equals(player))
-			{
-				List<Card> discardedCards = p.getDiscardedCards();
-
-				for (Card c : cards)
-				{
-					discardedCards.add(c);
-				}
-				break;
-			}
-		}
+		return allCards;
 	}
 
-	public void playCards(Player player, Card card)
+	public CardCollection getRemainingDeck()
 	{
+		return remainingDeck;
+	}
 
+	public void setRemainingDeck(CardCollection remainingDeck)
+	{
+		this.remainingDeck = remainingDeck;
+	}
+
+	public State getState()
+	{
+		return state;
+	}
+
+	public void setState(State state)
+	{
+		this.state = state;
+	}
+
+	public Player getDealer()
+	{
+		return dealer;
+	}
+
+	public void setDealer(Player dealer)
+	{
+		this.dealer = dealer;
+	}
+
+	public Player getActivePlayer()
+	{
+		return activePlayer;
+	}
+
+	public void setActivePlayer(Player activePlayer)
+	{
+		this.activePlayer = activePlayer;
+	}
+
+	public Card getCutCard()
+	{
+		return cutCard;
+	}
+
+	public void setCutCard(Card cutCard)
+	{
+		this.cutCard = cutCard;
 	}
 }

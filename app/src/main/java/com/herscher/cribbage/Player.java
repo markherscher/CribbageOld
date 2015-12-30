@@ -13,6 +13,7 @@ public class Player
 	private final String name;
 	private final List<Card> hand;
 	private final List<Card> discardedCards;
+	private final List<Card> playedCards;
 	private final int id;
 	private int currentScore;
 	private int lastScore;
@@ -28,6 +29,7 @@ public class Player
 		this.id = id;
 		hand = new ArrayList<>();
 		discardedCards = new ArrayList<>();
+		playedCards = new ArrayList<>();
 	}
 
 	public void resetScore()
@@ -67,7 +69,9 @@ public class Player
 		return hand;
 	}
 
-	protected List<Card> getDiscardedCards() { return discardedCards; }
+	public List<Card> getDiscardedCards() { return discardedCards; }
+
+	public List<Card> getPlayedCards() { return playedCards; }
 
 	@Override
 	public String toString()

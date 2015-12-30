@@ -2,6 +2,9 @@ package com.herscher.cribbage;
 
 import android.support.annotation.NonNull;
 
+import com.herscher.cribbage.scoring.PlayScoreProcessor;
+import com.herscher.cribbage.scoring.ShowdownScoreProcessor;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -9,33 +12,45 @@ import java.util.concurrent.CopyOnWriteArrayList;
 /**
  * TODO COMMENT
  * TODO Create interface
+ * <p/>
+ * This class is not thread-safe. The thread used for public methods will be used to fire events.
  */
 public class CribbageGame
 {
 	public enum State
 	{
+		NEW,
 		DISCARD,
 		PLAY,
 		SCORE,
 		COMPLETED
 	}
 
-	private final static int PLAYER_DEAL_COUNT = 6;
+	public interface ActionHandler
+	{
+		void discardCards(@NonNull Player player, @NonNull Card[] cards) throws RulesViolationException;
+		ScoreUnit[] playCard(@NonNull Player player, @NonNull Card card) throws RulesViolationException;
+	}
+
+	private final static int PLAY_COUNT = 4;
 	private final static int DISCARD_COUNT = 2;
+	private final static int DEAL_COUNT = PLAY_COUNT + DISCARD_COUNT;
 	private final static int POINTS_TO_WIN = 100;// TODO: made up
 
 	private final List<Listener> listeners;
 	private final List<Player> players;
 	private final List<Card> crib;
-	private final StandardPlayScoringProcessor playScoreProcessor;
+	private final PlayScoreProcessor playScoreProcessor;
+	private final ShowdownScoreProcessor showdownScoreProcessor;
 	private CardCollection allCards;
 	private State state;
 	private Player dealer;
 	private Player activePlayer;
 	private Player winner;
 	private Card cutCard;
+	private ActionHandler currentActionHandler;
 
-	public CribbageGame(@NonNull StandardPlayScoringProcessor playScoreProcessor, @NonNull Player[] players)
+	public CribbageGame(@NonNull PlayScoreProcessor playScoreProcessor, @NonNull ShowdownScoreProcessor showdownScoreProcessor, @NonNull Player[] players)
 	{
 		if (players == null || players.length <= 1)
 		{
@@ -43,9 +58,11 @@ public class CribbageGame
 		}
 
 		this.playScoreProcessor = playScoreProcessor;
+		this.showdownScoreProcessor = showdownScoreProcessor;
 		this.players = new ArrayList<>();
 		listeners = new CopyOnWriteArrayList<>();
 		crib = new ArrayList<>();
+		state = State.NEW;
 
 		for (Player p : players)
 		{
@@ -84,26 +101,46 @@ public class CribbageGame
 
 	/**
 	 * Must be already shuffled.
+	 *
 	 * @param allCards
 	 */
 	public void startGame(@NonNull CardCollection allCards)
 	{
-		if (state != State.COMPLETED)
+		if (state != State.NEW)
 		{
 			throw new IllegalStateException();
 		}
 
+		if (allCards.remaining() < getMinimumDealCount())
+		{
+			throw new IllegalArgumentException(String
+					.format("Required at least %d cards to deal, but only have %d", allCards
+							.remaining(), getMinimumDealCount()));
+		}
+
+		state = State.SCORE;
 		startNewRound(allCards);
 	}
 
-	// TODO: verify there are enough cards
-
 	/**
 	 * Must be already shuffled.
+	 *
 	 * @param allCards
 	 */
 	public void startNewRound(@NonNull CardCollection allCards)
 	{
+		if (state != State.SCORE)
+		{
+			throw new IllegalStateException("state is not SCORE");
+		}
+
+		if (allCards.remaining() < getMinimumDealCount())
+		{
+			throw new IllegalArgumentException(String
+					.format("Required at least %d cards to deal, but only have %d", allCards
+							.remaining(), getMinimumDealCount()));
+		}
+
 		if (!checkForWinner())
 		{
 			for (Player p : players)
@@ -112,10 +149,12 @@ public class CribbageGame
 			}
 
 			this.allCards = new CardCollection(allCards);
+			allCards.reset();
 			dealer = getNextPlayer(dealer);
 			activePlayer = null;
 			cutCard = null;
 			state = State.DISCARD;
+			playScoreProcessor.reset();
 
 			dealCards();
 
@@ -129,59 +168,14 @@ public class CribbageGame
 
 	public void discardCards(@NonNull Player player, @NonNull Card[] cards) throws RulesViolationException
 	{
-		if (player == null || cards == null)
-		{
-			throw new IllegalArgumentException();
-		}
-
-		List<Card> playerHand = player.getHand();
-
-		for (Card c : cards)
-		{
-			if (c == null)
-			{
-				throw new IllegalArgumentException();
-			}
-
-			if (!playerHand.contains(c))
-			{
-				throw new RulesViolationException("card is not in player's hand");
-			}
-		}
-
-		if (state != State.DISCARD)
-		{
-			throw new RulesViolationException("state is not DISCARD");
-		}
-
-		if (cards.length != DISCARD_COUNT)
-		{
-			throw new RulesViolationException("incorrect number of cards discarded");
-		}
-
-		if (players.indexOf(player) < 0)
-		{
-			throw new RulesViolationException("player is not in the game");
-		}
-
-		List<Card> playerDiscard = player.getDiscardedCards();
-
-		if (playerDiscard.size() != 0)
-		{
-			throw new RulesViolationException("player has already discarded");
-		}
-
-		for (Card c : cards)
-		{
-			playerDiscard.add(c);
-			crib.add(c);
-		}
+		currentActionHandler.discardCards(player, cards);
 
 		for (Listener l : listeners)
 		{
 			l.onCardsDiscarded(player, cards);
 		}
 
+		// If everyone has discarded then we can start playing
 		if (allPlayersDiscarded())
 		{
 			startPlayState();
@@ -190,33 +184,7 @@ public class CribbageGame
 
 	public void playCard(@NonNull Player player, @NonNull Card card) throws RulesViolationException
 	{
-		if (player == null || card == null)
-		{
-			throw new IllegalArgumentException();
-		}
-
-		if (state != State.PLAY)
-		{
-			throw new RulesViolationException("state is not PLAY");
-		}
-
-		if (!player.equals(activePlayer))
-		{
-			throw new RulesViolationException("player is not the active player");
-		}
-
-		if (!player.getHand().contains(card))
-		{
-			throw new RulesViolationException("card is not in player's hand");
-		}
-
-		if (!isCardLegalToPlay(card))
-		{
-			throw new RulesViolationException("card is not legal to play");
-		}
-
-		// TODO: Score all at end of round
-		ScoreUnit scoreUnits[] = playScoreProcessor.playCard(card);
+		ScoreUnit[] scoreUnits = currentActionHandler.playCard(player, card);
 
 		for (Listener l : listeners)
 		{
@@ -225,11 +193,16 @@ public class CribbageGame
 
 		for (ScoreUnit su : scoreUnits)
 		{
-			activePlayer.addScore(su.getPoints());
+			int pointChange = su.getPoints();
 
-			for (Listener l : listeners)
+			if (pointChange != 0)
 			{
-				l.onScoreChanged(activePlayer);
+				activePlayer.addScore(su.getPoints());
+
+				for (Listener l : listeners)
+				{
+					l.onScoreChanged(activePlayer, su);
+				}
 			}
 		}
 
@@ -239,13 +212,36 @@ public class CribbageGame
 		}
 	}
 
-	private void continuePlay()
+	/**
+	 * Gets the next player that can legally play, or null if no one can. Remember this for the
+	 * play only, not lead.
+	 *
+	 * @return
+	 */
+	private Player getNextLegalPlayerForPlay()
 	{
-		Player localActivePlayer = activePlayer;
-		boolean cardsRemain = false;
+		// Find a player that can play a card.
+		Player testPlayer = activePlayer;
 
-		// Check that there are cards remaining to play. If not the round is over.
-		Player testPlayer = localActivePlayer;
+		do
+		{
+			testPlayer = getNextPlayer(testPlayer);
+
+			for (Card c : testPlayer.getHand())
+			{
+				if (isCardLegalToPlay(c, testPlayer))
+				{
+					return testPlayer;
+				}
+			}
+		} while (testPlayer != activePlayer);
+
+		return null;
+	}
+
+	private Player getNextLegalPlayerForLead()
+	{
+		Player testPlayer = activePlayer;
 
 		do
 		{
@@ -253,53 +249,64 @@ public class CribbageGame
 
 			if (testPlayer.getHand().size() > 0)
 			{
-				cardsRemain = true;
-				break;
+				return testPlayer;
 			}
 		} while (testPlayer != activePlayer);
 
-		if (cardsRemain)
-		{
-			// Find a player that can play a card. If there are none then the count must be reset.
-			boolean isLegalCard = false;
-			testPlayer = localActivePlayer;
-			do
-			{
-				for (Card c : testPlayer.getHand())
-				{
-					if (playScoreProcessor.isCardLegalToPlay(c))
-					{
-						isLegalCard = true;
-						break;
-					}
-				}
-			} while (testPlayer != activePlayer);
+		return null;
+	}
 
-			if (testPlayer == null)
-			{
-				// No valid cards can be played, so reset the count
-				// TODO: must give one point to active player
-				playScoreProcessor.reset();
-				setActivePlayer(getNextPlayer(activePlayer));
-			}
-			else
-			{
-				setActivePlayer(testPlayer);
-			}
+	private void continuePlay()
+	{
+		Player playPlayer = getNextLegalPlayerForPlay();
+		Player leadPlayer = getNextLegalPlayerForLead();
+
+		if (playPlayer != null)
+		{
+			// Someone can play a card
+			setActivePlayer(playPlayer);
 
 			for (Listener l : listeners)
 			{
 				l.onPlayRequired(activePlayer);
 			}
 		}
+		else if (leadPlayer != null)
+		{
+			// No one can play a card, but if we reset the count someone can play
+			playScoreProcessor.reset();
+			setActivePlayer(leadPlayer);
+
+			for (Listener l : listeners)
+			{
+				l.onLeadRequired(activePlayer);
+			}
+		}
 		else
 		{
-			// Round is over
+			// No one can play or lead, so round is over
+			// No one available to lead, so round is over
+			// TODO: need to score here
+			state = State.SCORE;
+
+			// TODO: score in correct order. First winner wins.
+			//showdownScoreProcessor.calculateScore()
+
 			for (Listener l : listeners)
 			{
 				l.onRoundCompleted();
 			}
 		}
+	}
+
+	private void scoreShowdown()
+	{
+
+	}
+
+	private void scoreCardPlayed()
+	{
+
 	}
 
 	private void finishGame(Player winner)
@@ -313,9 +320,14 @@ public class CribbageGame
 		}
 	}
 
-	public boolean isCardLegalToPlay(Card card)
+	private int getMinimumDealCount()
 	{
-		return playScoreProcessor.isCardLegalToPlay(card);
+		return (players.size() * DEAL_COUNT) + 1; // +1 for cut card
+	}
+
+	public boolean isCardLegalToPlay(Card card, Player player)
+	{
+		return player.getHand().contains(card) && playScoreProcessor.isCardLegalToPlay(card);
 	}
 
 	public State getState()
@@ -336,6 +348,11 @@ public class CribbageGame
 	public Card getCutCard()
 	{
 		return cutCard;
+	}
+
+	public int getPlayCount()
+	{
+		return playScoreProcessor.getCount();
 	}
 
 	private boolean checkForWinner()
@@ -368,14 +385,13 @@ public class CribbageGame
 		for (Listener l : listeners)
 		{
 			l.onPlayStarted(cutCard);
-			l.onPlayRequired(activePlayer);
+			l.onLeadRequired(activePlayer);
 		}
 	}
 
 	private void setActivePlayer(Player p)
 	{
 		activePlayer = p;
-		playScoreProcessor.setPlayer(activePlayer);
 	}
 
 	private void dealCards()
@@ -389,7 +405,7 @@ public class CribbageGame
 			List<Card> hand = p.getHand();
 			hand.clear();
 
-			for (int i = 0; i < PLAYER_DEAL_COUNT; i++)
+			for (int i = 0; i < DEAL_COUNT; i++)
 			{
 				hand.add(allCards.getNext());
 			}
@@ -400,7 +416,7 @@ public class CribbageGame
 	{
 		for (Player p : players)
 		{
-			if (p.getDiscardedCards().size() != 0)
+			if (p.getDiscardedCards().size() == 0)
 			{
 				return false;
 			}
@@ -437,11 +453,13 @@ public class CribbageGame
 
 		void onPlayRequired(Player player);
 
+		void onLeadRequired(Player player);
+
 		void onCardsDiscarded(Player player, Card[] cards);
 
 		void onCardPlayed(Player player, Card card);
 
-		void onScoreChanged(Player player);
+		void onScoreChanged(Player player, ScoreUnit reason);
 
 		void onRoundCompleted();
 

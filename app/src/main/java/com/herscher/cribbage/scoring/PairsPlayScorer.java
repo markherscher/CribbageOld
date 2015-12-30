@@ -1,6 +1,9 @@
-package com.herscher.cribbage;
+package com.herscher.cribbage.scoring;
 
 import android.support.annotation.Nullable;
+
+import com.herscher.cribbage.Card;
+import com.herscher.cribbage.ScoreUnit;
 
 import java.util.List;
 
@@ -37,7 +40,9 @@ public class PairsPlayScorer implements PlayScorer
 		}
 		else
 		{
-			return new PairsScoreUnit(compareFace, repeatCount);
+			// TODO
+			return null;
+			//return new PairsScoreUnit(compareFace, repeatCount);
 		}
 	}
 }

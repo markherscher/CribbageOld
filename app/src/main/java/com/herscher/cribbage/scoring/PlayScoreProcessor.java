@@ -24,7 +24,7 @@ public class PlayScoreProcessor
 	private final PlayScorer[] scorers;
 	private int count;
 
-	public PlayScoreProcessor(PlayScorer[] scorers)
+	public PlayScoreProcessor(PlayScorer... scorers)
 	{
 		this.scorers = scorers;
 		playedCards = new ArrayList<>();

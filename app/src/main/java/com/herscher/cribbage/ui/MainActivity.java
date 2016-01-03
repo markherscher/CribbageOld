@@ -24,12 +24,11 @@ import com.herscher.cribbage.R;
 import com.herscher.cribbage.RulesViolationException;
 import com.herscher.cribbage.scoring.RunsPlayScorer;
 import com.herscher.cribbage.ScoreUnit;
-import com.herscher.cribbage.test.GameTest;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class MainActivity extends Activity implements CribbageGame.Listener
+public class MainActivity extends Activity
 {
 	private CribbageGame game;
 	private LinearLayout player1Layout;
@@ -89,8 +88,6 @@ public class MainActivity extends Activity implements CribbageGame.Listener
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_main);
 
-		new GameTest(new Handler()).runTests();
-
 		playerInfos = new PlayerInfo[2];
 
 		playerInfos[0] = new PlayerInfo();
@@ -143,7 +140,7 @@ public class MainActivity extends Activity implements CribbageGame.Listener
 
 		if (game != null)
 		{
-			game.removeListener(this);
+			//game.removeListener(this);
 		}
 
 		CardCollection cards = new CardCollection(CardDeckFactory.get52CardDeck());
@@ -154,8 +151,8 @@ public class MainActivity extends Activity implements CribbageGame.Listener
 
 		//game = new CribbageGame(scoringProcessor, new Player[]{playerInfos[0].player, playerInfos[1].player});
 		game = null;
-		game.addListener(this);
-		game.startGame(cards);
+		//game.addListener(this);
+		//game.startGame(cards);
 	}
 
 	private void showEvent(String text)
@@ -208,6 +205,7 @@ public class MainActivity extends Activity implements CribbageGame.Listener
 		}
 	}
 
+	/*
 	@Override
 	public void onRoundStarted()
 	{
@@ -296,6 +294,7 @@ public class MainActivity extends Activity implements CribbageGame.Listener
 		updateShownState();
 		showEvent(String.format("Game is over. %s wins!", winningPlayer.getName()));
 	}
+	*/
 
 	private void discardCard(CardView cardView, Player player)
 	{

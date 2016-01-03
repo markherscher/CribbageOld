@@ -42,6 +42,12 @@ public class Card implements Comparable<Card>
 	private final Suit suit;
 	private final Face face;
 
+	public Card()
+	{
+		suit = Suit.HEARTS;
+		face = Face.ACE;
+	}
+
 	public Card(@NonNull Suit suit, @NonNull Face face)
 	{
 		if (suit == null || face == null)

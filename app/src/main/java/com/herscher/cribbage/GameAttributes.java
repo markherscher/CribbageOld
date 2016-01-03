@@ -9,7 +9,7 @@ import java.util.List;
 /**
  * TODO add comments
  */
-public class GameState
+public class GameAttributes
 {
 	public enum State
 	{
@@ -28,7 +28,7 @@ public class GameState
 	private Player activePlayer;
 	private Card cutCard;
 
-	public GameState(@NonNull Player[] players)
+	public GameAttributes(@NonNull Player[] players)
 	{
 		this.players = new ArrayList<>();
 		crib = new CardCollection();

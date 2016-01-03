@@ -28,6 +28,7 @@ public class CardCollection implements Iterable<Card>
 	public CardCollection(@NonNull CardCollection copy)
 	{
 		cardList = new ArrayList<>(copy.cardList);
+		index = copy.index;
 	}
 
 	public void shuffle()
@@ -93,5 +94,32 @@ public class CardCollection implements Iterable<Card>
 	public Iterator<Card> iterator()
 	{
 		return cardList.iterator();
+	}
+
+	@Override
+	public boolean equals(Object o)
+	{
+		if (o instanceof CardCollection)
+		{
+			CardCollection other = (CardCollection) o;
+			if (index != other.index || cardList.size() != cardList.size())
+			{
+				return false;
+			}
+
+			for (int i = 0; i < cardList.size(); i++)
+			{
+				if (!cardList.get(i).equals(other.cardList.get(i)))
+				{
+					return false;
+				}
+			}
+
+			return true;
+		}
+		else
+		{
+			return false;
+		}
 	}
 }

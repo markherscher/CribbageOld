@@ -1,6 +1,9 @@
 package com.herscher.cribbage.model;
 
+import com.herscher.cribbage.Card;
 import com.herscher.cribbage.Player;
+import com.herscher.cribbage.RulesViolationException;
+import com.herscher.cribbage.comm.message.Message;
 
 /**
  * TODO add comments
@@ -11,7 +14,11 @@ public interface PlayerBridge
 
 	void removeListener(Listener l);
 
-	void send(GameEvent event, GameEventSendCallback callback);
+	void notifyCardsDiscarded(Card[] cards, NotifyCompleteCallback callback);
+
+	void notifyCardsPlayed(Card card, NotifyCompleteCallback callback);
+
+	void notifyRulesViolation(RulesViolationException error, NotifyCompleteCallback callback);
 
 	void close();
 
@@ -19,13 +26,22 @@ public interface PlayerBridge
 
 	interface Listener
 	{
-		void onEventReceived(GameEvent event);
+		void onCardsDiscarded(Card[] cards);
+
+		void onCardPlayed(Card card);
+
+		void onRulesViolation(RulesViolationException error);
 
 		void onClosed();
 	}
 
 	interface GameEventSendCallback
 	{
-		void onCompleted(GameEvent event, Exception error);
+		void onCompleted(Message event, Exception error);
+	}
+
+	interface NotifyCompleteCallback
+	{
+		void onCompleted(Exception error);
 	}
 }

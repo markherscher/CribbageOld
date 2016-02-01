@@ -3,8 +3,12 @@ package com.herscher.cribbage.comm;
 import android.os.Handler;
 import android.util.Log;
 
+import com.herscher.cribbage.Card;
 import com.herscher.cribbage.Player;
-import com.herscher.cribbage.model.GameEvent;
+import com.herscher.cribbage.RulesViolationException;
+import com.herscher.cribbage.comm.message.DiscardCardsMessage;
+import com.herscher.cribbage.comm.message.Message;
+import com.herscher.cribbage.comm.message.PlayCardMessage;
 import com.herscher.cribbage.model.PlayerBridge;
 
 import java.io.IOException;
@@ -20,13 +24,13 @@ public class RemotePlayerBridge implements PlayerBridge
 	private final static String TAG = "RemotePlayerBridge";
 
 	private final Player player;
-	private final RemoteConnection connection;
+	private final MessageConnection connection;
 	private final Handler handler;
-	private final HashMap<GameEvent, GameEventSendCallback> sendCallbacks;
+	private final HashMap<Message, NotifyCompleteCallback> sendCallbacks;
 	private final List<Listener> listeners;
 	private boolean isOpen;
 
-	public RemotePlayerBridge(Player player, RemoteConnection connection, Handler handler)
+	public RemotePlayerBridge(Player player, MessageConnection connection, Handler handler)
 	{
 		if (player == null || connection == null || handler == null)
 		{
@@ -57,29 +61,21 @@ public class RemotePlayerBridge implements PlayerBridge
 	}
 
 	@Override
-	public void send(final GameEvent event, final GameEventSendCallback callback)
+	public void notifyCardsDiscarded(Card[] cards, NotifyCompleteCallback callback)
 	{
-		if (event == null)
-		{
-			throw new IllegalArgumentException();
-		}
+		sendMessage(new DiscardCardsMessage(cards), callback);
+	}
 
-		handler.post(new Runnable()
-		{
-			@Override
-			public void run()
-			{
-				if (isOpen)
-				{
-					sendCallbacks.put(event, callback);
-					connection.send(event);
-				}
-				else if (callback != null)
-				{
-					callback.onCompleted(event, new IOException("bridge is closed"));
-				}
-			}
-		});
+	@Override
+	public void notifyCardsPlayed(Card card, NotifyCompleteCallback callback)
+	{
+		sendMessage(new PlayCardMessage(card), callback);
+	}
+
+	@Override
+	public void notifyRulesViolation(RulesViolationException error, NotifyCompleteCallback callback)
+	{
+		// TODO
 	}
 
 	@Override
@@ -112,12 +108,50 @@ public class RemotePlayerBridge implements PlayerBridge
 		return player;
 	}
 
-	private class RemoteConnectionListener implements RemoteConnection.Listener
+	private void sendMessage(final Message message, final NotifyCompleteCallback callback)
+	{
+		handler.post(new Runnable()
+		{
+			@Override
+			public void run()
+			{
+				if (isOpen)
+				{
+					sendCallbacks.put(message, callback);
+					connection.send(message);
+				}
+				else if (callback != null)
+				{
+					callback.onCompleted(new IOException("bridge is closed"));
+				}
+			}
+		});
+	}
+
+	private void handleReceivedMessage(Message message)
+	{
+		if (message instanceof PlayCardMessage)
+		{
+			for (Listener l : listeners)
+			{
+				l.onCardPlayed(((PlayCardMessage) message).getCard());
+			}
+		}
+		else if (message instanceof DiscardCardsMessage)
+		{
+			for (Listener l : listeners)
+			{
+				l.onCardsDiscarded(((DiscardCardsMessage) message).getCards());
+			}
+		}
+	}
+
+	private class RemoteConnectionListener implements MessageConnection.Listener
 	{
 		@Override
-		public void onSendComplete(final GameEvent event, final IOException error)
+		public void onSendComplete(final Message event, final IOException error)
 		{
-			final GameEventSendCallback callback = sendCallbacks.remove(event);
+			final NotifyCompleteCallback callback = sendCallbacks.remove(event);
 
 			if (callback != null)
 			{
@@ -128,7 +162,7 @@ public class RemotePlayerBridge implements PlayerBridge
 					{
 						if (isOpen)
 						{
-							callback.onCompleted(event, error);
+							callback.onCompleted(error);
 						}
 					}
 				});
@@ -136,7 +170,7 @@ public class RemotePlayerBridge implements PlayerBridge
 		}
 
 		@Override
-		public void onReceived(final GameEvent event)
+		public void onReceived(final Message event)
 		{
 			handler.post(new Runnable()
 			{
@@ -145,10 +179,7 @@ public class RemotePlayerBridge implements PlayerBridge
 				{
 					if (isOpen)
 					{
-						for (Listener l : listeners)
-						{
-							l.onEventReceived(event);
-						}
+						handleReceivedMessage(event);
 					}
 				}
 			});

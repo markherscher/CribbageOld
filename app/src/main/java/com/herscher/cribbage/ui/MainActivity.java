@@ -2,7 +2,6 @@ package com.herscher.cribbage.ui;
 
 import android.app.Activity;
 import android.graphics.Color;
-import android.os.Handler;
 import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -23,7 +22,6 @@ import com.herscher.cribbage.Player;
 import com.herscher.cribbage.R;
 import com.herscher.cribbage.RulesViolationException;
 import com.herscher.cribbage.scoring.RunsPlayScorer;
-import com.herscher.cribbage.ScoreUnit;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -168,7 +166,7 @@ public class MainActivity extends Activity
 				state.setText("Discarding");
 				break;
 
-			case COMPLETED:
+			case GAME_COMPLETE:
 				state.setText("Completed");
 				break;
 
@@ -176,8 +174,8 @@ public class MainActivity extends Activity
 				state.setText("Playing");
 				break;
 
-			case SCORE:
-				state.setText("Scoring");
+			case ROUND_COMPLETE:
+				state.setText("Round Complete");
 				break;
 		}
 	}

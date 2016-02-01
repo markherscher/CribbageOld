@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Random;
 
 /**
  * TODO COMMENT
@@ -31,9 +32,9 @@ public class CardCollection implements Iterable<Card>
 		index = copy.index;
 	}
 
-	public void shuffle()
+	public void shuffle(long seed)
 	{
-		Collections.shuffle(cardList);
+		Collections.shuffle(cardList, new Random(seed));
 	}
 
 	public void removeAll()

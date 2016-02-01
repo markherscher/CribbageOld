@@ -1,18 +1,17 @@
-package com.herscher.cribbage;
+package com.herscher.cribbage.scoring;
+
+import android.support.annotation.NonNull;
+
+import com.herscher.cribbage.Card;
 
 /**
  * TODO add comments
  */
-public class FifteensScoreUnit implements ScoreUnit
+public class RunsScoreUnit implements ScoreUnit
 {
 	private final Card[] cards;
 
-	public FifteensScoreUnit()
-	{
-		cards = null;
-	}
-
-	public FifteensScoreUnit(Card[] cards)
+	public RunsScoreUnit(@NonNull Card[] cards)
 	{
 		this.cards = cards;
 	}
@@ -26,12 +25,12 @@ public class FifteensScoreUnit implements ScoreUnit
 	@Override
 	public int getPoints()
 	{
-		return 2;
+		return 0;
 	}
 
 	@Override
 	public String getDescription()
 	{
-		return "fifteen";
+		return null;
 	}
 }

@@ -4,7 +4,7 @@ import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.KryoException;
 import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
-import com.herscher.cribbage.model.GameEvent;
+import com.herscher.cribbage.comm.message.Message;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -12,15 +12,15 @@ import java.io.IOException;
 /**
  * TODO add comments
  */
-public class KryoGameEventSerializer implements GameEventSerializer
+public class KryoMessageSerializer implements MessageSerializer
 {
 	private final Kryo kryo;
 
-	public KryoGameEventSerializer()
+	public KryoMessageSerializer()
 	{
 		kryo = new Kryo();
 
-		kryo.register(GameEvent.class);
+		kryo.register(Message.class);
 	}
 
 	@SuppressWarnings("rawtypes")
@@ -30,7 +30,7 @@ public class KryoGameEventSerializer implements GameEventSerializer
 	}
 
 	@Override
-	public GameEvent deserialize(byte[] rawBytes) throws IOException
+	public Message deserialize(byte[] rawBytes) throws IOException
 	{
 		if (rawBytes == null)
 		{
@@ -53,18 +53,18 @@ public class KryoGameEventSerializer implements GameEventSerializer
 			input.close();
 		}
 
-		if (obj instanceof GameEvent)
+		if (obj instanceof Message)
 		{
-			return (GameEvent) obj;
+			return (Message) obj;
 		}
 		else
 		{
-			throw new IOException("resulting object type was not GameEvent");
+			throw new IOException("resulting object type was not Message");
 		}
 	}
 
 	@Override
-	public byte[] serialize(GameEvent message) throws IOException
+	public byte[] serialize(Message message) throws IOException
 	{
 		if (message == null)
 		{

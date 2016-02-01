@@ -1,16 +1,16 @@
 package com.herscher.cribbage.comm;
 
-import com.herscher.cribbage.model.GameEvent;
+import com.herscher.cribbage.comm.message.Message;
 
 import java.io.IOException;
 
-public interface RemoteConnection
+public interface MessageConnection
 {
 	interface Listener
 	{
-		void onSendComplete(GameEvent event, IOException error);
+		void onSendComplete(Message message, IOException error);
 
-		void onReceived(GameEvent event);
+		void onReceived(Message message);
 
 		void onReceiveError(IOException error);
 
@@ -21,7 +21,7 @@ public interface RemoteConnection
 
 	void removeListener(Listener listener);
 
-	void send(GameEvent event);
+	void send(Message message);
 
 	boolean isOpen();
 

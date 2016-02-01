@@ -4,7 +4,6 @@ import android.support.annotation.NonNull;
 
 import com.herscher.cribbage.Card;
 import com.herscher.cribbage.RulesViolationException;
-import com.herscher.cribbage.ScoreUnit;
 
 import java.util.ArrayList;
 import java.util.List;

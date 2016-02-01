@@ -2,8 +2,7 @@ package com.herscher.cribbage.comm;
 
 import android.util.Log;
 
-import com.herscher.cribbage.RemoteTransport;
-import com.herscher.cribbage.model.GameEvent;
+import com.herscher.cribbage.comm.message.Message;
 
 import java.io.IOException;
 import java.util.List;
@@ -14,29 +13,29 @@ import java.util.concurrent.CopyOnWriteArrayList;
 /**
  * TODO add comments. And worry about thread safety?
  */
-public class RemoteGameEventConnection implements RemoteConnection
+public class RemoteMessageConnection implements MessageConnection
 {
-	private final static String TAG = "RemoteGameEventConnection";
+	private final static String TAG = "RemoteGameEventConn";
 
 	private final RemoteTransport transport;
-	private final GameEventSerializer gameEventSerializer;
-	private final Queue<GameEvent> outgoingQueue;
+	private final MessageSerializer messageSerializer;
+	private final Queue<Message> outgoingQueue;
 	private final List<Listener> listeners;
-	private GameEvent eventBeingSent;
+	private Message eventBeingSent;
 	private boolean isOpen;
 
-	public RemoteGameEventConnection(RemoteTransport transport, GameEventSerializer gameEventSerializer)
+	public RemoteMessageConnection(RemoteTransport transport, MessageSerializer messageSerializer)
 	{
-		if (transport == null || gameEventSerializer == null)
+		if (transport == null || messageSerializer == null)
 		{
 			throw new IllegalArgumentException();
 		}
 
 		this.transport = transport;
-		this.gameEventSerializer = gameEventSerializer;
+		this.messageSerializer = messageSerializer;
 		outgoingQueue = new ConcurrentLinkedQueue<>();
 		listeners = new CopyOnWriteArrayList<>();
-		transport.addListener(transportListener);
+		this.transport.addListener(transportListener);
 		isOpen = true;
 	}
 
@@ -56,7 +55,7 @@ public class RemoteGameEventConnection implements RemoteConnection
 	}
 
 	@Override
-	public void send(GameEvent event)
+	public void send(Message event)
 	{
 		if (event == null)
 		{
@@ -106,7 +105,7 @@ public class RemoteGameEventConnection implements RemoteConnection
 	{
 		if (eventBeingSent != null)
 		{
-			GameEvent event = outgoingQueue.poll();
+			Message event = outgoingQueue.poll();
 
 			if (event != null)
 			{
@@ -114,7 +113,7 @@ public class RemoteGameEventConnection implements RemoteConnection
 
 				try
 				{
-					rawBytes = gameEventSerializer.serialize(event);
+					rawBytes = messageSerializer.serialize(event);
 				}
 				catch (IOException e)
 				{
@@ -135,7 +134,7 @@ public class RemoteGameEventConnection implements RemoteConnection
 		{
 			if (isOpen)
 			{
-				GameEvent sentEvent;
+				Message sentEvent;
 
 				synchronized (outgoingQueue)
 				{
@@ -156,11 +155,11 @@ public class RemoteGameEventConnection implements RemoteConnection
 		{
 			if (isOpen)
 			{
-				GameEvent receivedEvent;
+				Message receivedEvent;
 
 				try
 				{
-					receivedEvent = gameEventSerializer.deserialize(buffer);
+					receivedEvent = messageSerializer.deserialize(buffer);
 				}
 				catch (IOException e)
 				{

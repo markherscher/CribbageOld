@@ -1,4 +1,6 @@
-package com.herscher.cribbage;
+package com.herscher.cribbage.scoring;
+
+import com.herscher.cribbage.Card;
 
 /**
  * TODO add comments

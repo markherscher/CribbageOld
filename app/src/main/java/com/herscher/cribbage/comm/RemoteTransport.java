@@ -1,4 +1,4 @@
-package com.herscher.cribbage;
+package com.herscher.cribbage.comm;
 
 import java.io.IOException;
 

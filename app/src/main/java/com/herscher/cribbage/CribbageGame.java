@@ -3,6 +3,7 @@ package com.herscher.cribbage;
 import android.support.annotation.NonNull;
 
 import com.herscher.cribbage.scoring.PlayScoreProcessor;
+import com.herscher.cribbage.scoring.ScoreUnit;
 import com.herscher.cribbage.scoring.ShowdownScoreProcessor;
 
 import java.util.ArrayList;
@@ -21,10 +22,11 @@ public class CribbageGame
 		NEW,
 		DISCARD,
 		PLAY,
-		SCORE,
-		COMPLETED
+		ROUND_COMPLETE,
+		GAME_COMPLETE
 	}
 
+	// TODO; PROVIDE THESE SOMEHOW? Public functions rely on these.
 	private final static int PLAY_COUNT = 4;
 	private final static int DISCARD_COUNT = 2;
 	private final static int DEAL_COUNT = PLAY_COUNT + DISCARD_COUNT;
@@ -112,6 +114,12 @@ public class CribbageGame
 		return player.getHand().contains(card) && playScoreProcessor.isCardLegalToPlay(card);
 	}
 
+	public ScoreUnit[] getEndOfRoundScoringForPlayer(Player player)
+	{
+		// TODO
+		return new ScoreUnit[0];
+	}
+
 	public Card[] getCrib()
 	{
 		return crib.toArray(new Card[crib.size()]);
@@ -150,6 +158,11 @@ public class CribbageGame
 	public int getPlayCount()
 	{
 		return playScoreProcessor.getCount();
+	}
+
+	public int getCardsPerDiscard()
+	{
+		return DISCARD_COUNT;
 	}
 
 	private boolean checkForWinner()
@@ -433,7 +446,7 @@ public class CribbageGame
 				continuePlay();
 			}
 
-			// TODO: Score all at end of round
+			// TODO need to go to end of game state
 			return scoreUnits;
 		}
 
@@ -456,11 +469,10 @@ public class CribbageGame
 			else
 			{
 				// No one can play or lead, so round is over
-				// No one available to lead, so round is over
-				// TODO: need to score here
-
 				// TODO: score in correct order. First winner wins.
 				//showdownScoreProcessor.calculateScore()
+
+				// Actually, probably should switch to a new state to handle scoring at round end
 			}
 		}
 
@@ -523,29 +535,4 @@ public class CribbageGame
 
 		stateActionHandler = handler;
 	}
-
-	/*
-	public interface Listener
-	{
-		void onRoundStarted();
-
-		void onPlayStarted(Card cutCard);
-
-		void onDiscardRequired(int cardCount);
-
-		void onPlayRequired(Player player);
-
-		void onLeadRequired(Player player);
-
-		void onCardsDiscarded(Player player, Card[] cards);
-
-		void onCardPlayed(Player player, Card card);
-
-		void onScoreChanged(Player player, ScoreUnit reason);
-
-		void onRoundCompleted();
-
-		void onGameCompleted(Player winningPlayer);
-	}
-	*/
 }

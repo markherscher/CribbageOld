@@ -14,11 +14,11 @@ public class Player
 	private final List<Card> hand;
 	private final List<Card> discardedCards;
 	private final List<Card> playedCards;
-	private final int id;
+	private final long id;
 	private int currentScore;
 	private int lastScore;
 
-	public Player(@NonNull String name, int id)
+	public Player(@NonNull String name, long id)
 	{
 		if (name == null)
 		{
@@ -73,10 +73,15 @@ public class Player
 
 	public List<Card> getPlayedCards() { return playedCards; }
 
+	public long getId()
+	{
+		return id;
+	}
+
 	@Override
 	public String toString()
 	{
-		return name;
+		return String.format("%s [%d]", name, id);
 	}
 
 	@Override

@@ -1,6 +1,8 @@
-package com.herscher.cribbage;
+package com.herscher.cribbage.scoring;
 
 import android.support.annotation.NonNull;
+
+import com.herscher.cribbage.Card;
 
 /**
  * TODO add comments

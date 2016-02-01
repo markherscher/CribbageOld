@@ -3,8 +3,6 @@ package com.herscher.cribbage.scoring;
 import android.support.annotation.Nullable;
 
 import com.herscher.cribbage.Card;
-import com.herscher.cribbage.FifteensScoreUnit;
-import com.herscher.cribbage.ScoreUnit;
 
 import java.util.List;
 

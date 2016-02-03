@@ -20,6 +20,8 @@ public interface PlayerBridge
 
 	void notifyRulesViolation(RulesViolationException error, NotifyCompleteCallback callback);
 
+	void notifyQuit(NotifyCompleteCallback callback);
+
 	void close();
 
 	Player getPlayer();
@@ -32,12 +34,9 @@ public interface PlayerBridge
 
 		void onRulesViolation(RulesViolationException error);
 
-		void onClosed();
-	}
+		void onQuit();
 
-	interface GameEventSendCallback
-	{
-		void onCompleted(Message event, Exception error);
+		void onClosed();
 	}
 
 	interface NotifyCompleteCallback

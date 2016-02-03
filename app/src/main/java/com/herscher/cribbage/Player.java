@@ -11,14 +11,9 @@ import java.util.List;
 public class Player
 {
 	private final String name;
-	private final List<Card> hand;
-	private final List<Card> discardedCards;
-	private final List<Card> playedCards;
 	private final long id;
-	private int currentScore;
-	private int lastScore;
 
-	public Player(@NonNull String name, long id)
+	public Player(String name, long id)
 	{
 		if (name == null)
 		{
@@ -27,51 +22,12 @@ public class Player
 
 		this.name = name;
 		this.id = id;
-		hand = new ArrayList<>();
-		discardedCards = new ArrayList<>();
-		playedCards = new ArrayList<>();
-	}
-
-	public void resetScore()
-	{
-		currentScore = 0;
-		lastScore = 0;
-	}
-
-	public void addScore(int points)
-	{
-		if (points < 0)
-		{
-			throw new IllegalArgumentException();
-		}
-
-		lastScore = currentScore;
-		currentScore += points;
-	}
-
-	public int getLastScore()
-	{
-		return lastScore;
-	}
-
-	public int getCurrentScore()
-	{
-		return currentScore;
 	}
 
 	public String getName()
 	{
 		return name;
 	}
-
-	public List<Card> getHand()
-	{
-		return hand;
-	}
-
-	public List<Card> getDiscardedCards() { return discardedCards; }
-
-	public List<Card> getPlayedCards() { return playedCards; }
 
 	public long getId()
 	{
@@ -89,8 +45,7 @@ public class Player
 	{
 		if (o instanceof Player)
 		{
-			Player other = (Player) o;
-			return id == other.id;
+			return id == ((Player)o).id;
 		}
 		else
 		{

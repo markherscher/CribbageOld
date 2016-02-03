@@ -5,6 +5,7 @@ import android.os.Handler;
 import com.herscher.cribbage.Card;
 import com.herscher.cribbage.CribbageGame;
 import com.herscher.cribbage.Player;
+import com.herscher.cribbage.PlayerState;
 import com.herscher.cribbage.RulesViolationException;
 import com.herscher.cribbage.scoring.ScoreUnit;
 
@@ -19,30 +20,19 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public class CribbageGameController
 {
 	private final CribbageGame game;
-	private final Player localPlayer;
-	private final PlayerBridge[] playerBridges;
 	private final List<Listener> listeners;
 	private final Handler handler;
 
-	public CribbageGameController(CribbageGame game, Player localPlayer, PlayerBridge[] playerBridges)
+	public CribbageGameController(CribbageGame game)
 	{
-		if (game == null || localPlayer == null || playerBridges == null)
+		if (game == null)
 		{
 			throw new IllegalArgumentException();
 		}
 
 		this.game = game;
-		this.localPlayer = localPlayer;
-		this.playerBridges = new PlayerBridge[playerBridges.length];
 		listeners = new CopyOnWriteArrayList<>();
 		handler = new Handler();
-
-		// Make a copy of the bridges array
-		for (int i = 0; i < playerBridges.length; i++)
-		{
-			this.playerBridges[i] = playerBridges[i];
-			this.playerBridges[i].addListener(new PlayerBridgeListener(this.playerBridges[i]));
-		}
 	}
 
 	public void addListener(Listener l)
@@ -58,32 +48,7 @@ public class CribbageGameController
 		listeners.remove(l);
 	}
 
-	public void discardCards(Card... cards) throws RulesViolationException
-	{
-		discardCardsAndFireEvents(cards, localPlayer);
-		// TODO SEND TO BRIDGES
-	}
-
-	public void playCard(Card card, GameEventCallback callback) throws RulesViolationException
-	{
-		playCardAndFireEvents(card, localPlayer);
-
-		// Notify all other players of the change
-		final BridgeCallbackAggregator aggregator = new BridgeCallbackAggregator(callback);
-		for (final PlayerBridge pb : playerBridges)
-		{
-			pb.notifyCardsPlayed(card, new PlayerBridge.NotifyCompleteCallback()
-			{
-				@Override
-				public void onCompleted(Exception error)
-				{
-					aggregator.handleResult(pb, error);
-				}
-			});
-		}
-	}
-
-	private void discardCardsAndFireEvents(Card[] cards, Player player) throws RulesViolationException
+	public void discardCards(PlayerState player, Card... cards) throws RulesViolationException
 	{
 		game.discardCards(player, cards);
 		boolean isPlayStarted = game.getState() != CribbageGame.State.DISCARD;
@@ -99,7 +64,7 @@ public class CribbageGameController
 		}
 	}
 
-	private void playCardAndFireEvents(Card card, Player player) throws RulesViolationException
+	public void playCard(PlayerState player, Card card) throws RulesViolationException
 	{
 		ScoreUnit[] scoreUnits = game.playCard(player, card);
 
@@ -173,17 +138,17 @@ public class CribbageGameController
 
 		void onDiscardRequired(int cardCount);
 
-		void onPlayRequired(Player player);
+		void onPlayRequired(PlayerState player);
 
-		void onLeadRequired(Player player);
+		void onLeadRequired(PlayerState player);
 
-		void onCardsDiscarded(Player player, Card[] cards);
+		void onCardsDiscarded(PlayerState player, Card[] cards);
 
-		void onCardPlayed(Player player, Card card, ScoreUnit[] scores);
+		void onCardPlayed(PlayerState player, Card card, ScoreUnit[] scores);
 
 		void onRoundCompleted(PlayerScores[] playerScores);
 
-		void onGameCompleted(Player winningPlayer);
+		void onGameCompleted(PlayerState winningPlayer);
 
 		class PlayerScores
 		{
@@ -205,93 +170,6 @@ public class CribbageGameController
 			{
 				return scores;
 			}
-		}
-	}
-
-	public interface GameEventCallback
-	{
-		void onSuccessful();
-
-		void onFailedForPlayer(Player player, Exception error);
-	}
-
-	private class BridgeCallbackAggregator
-	{
-		private final GameEventCallback callback;
-		private int callbackCount;
-		private boolean hasFailed;
-
-		public BridgeCallbackAggregator(GameEventCallback callback)
-		{
-			this.callback = callback;
-		}
-
-		public void handleResult(final PlayerBridge bridge, final Exception result)
-		{
-			handler.post(new Runnable()
-			{
-				@Override
-				public void run()
-				{
-					callbackCount++;
-
-					if (result == null)
-					{
-						if (!hasFailed && callbackCount >= playerBridges.length)
-						{
-							callback.onSuccessful();
-						}
-					}
-					else
-					{
-						// Report the failure
-						hasFailed = true;
-						callback.onFailedForPlayer(bridge.getPlayer(), result);
-					}
-				}
-			});
-		}
-	}
-
-	private class PlayerBridgeListener implements PlayerBridge.Listener
-	{
-		private final PlayerBridge bridge;
-
-		public PlayerBridgeListener(PlayerBridge bridge)
-		{
-			this.bridge = bridge;
-		}
-
-		@Override
-		public void onCardsDiscarded(Card[] cards)
-		{
-
-		}
-
-		@Override
-		public void onCardPlayed(Card card)
-		{
-			try
-			{
-				playCardAndFireEvents(card, bridge.getPlayer());
-			}
-			catch (RulesViolationException e)
-			{
-				// TODO what to do here
-				e.printStackTrace();
-			}
-		}
-
-		@Override
-		public void onRulesViolation(RulesViolationException error)
-		{
-
-		}
-
-		@Override
-		public void onClosed()
-		{
-			// TODO
 		}
 	}
 }

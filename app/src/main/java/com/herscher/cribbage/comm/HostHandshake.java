@@ -2,9 +2,10 @@ package com.herscher.cribbage.comm;
 
 import android.os.Handler;
 
+import com.herscher.cribbage.CribbageGame;
 import com.herscher.cribbage.Player;
+import com.herscher.cribbage.comm.message.JoinGameAcceptedResponseMessage;
 import com.herscher.cribbage.comm.message.JoinGameRequestMessage;
-import com.herscher.cribbage.comm.message.JoinGameResponseMessage;
 import com.herscher.cribbage.comm.message.Message;
 
 import java.io.IOException;
@@ -17,20 +18,24 @@ public class HostHandshake
 	private final static int RESPONSE_TIMEOUT = 2500;
 
 	private final MessageConnection messageConnection;
+	private final Player hostPlayer;
+	private final CribbageGame game;
 	private final Listener listener;
 	private final Handler handler;
 	private JoinGameRequestMessage receivedRequest;
-	private JoinGameResponseMessage outgoingResponse;
+	private JoinGameAcceptedResponseMessage outgoingResponse;
 	private boolean isRunning;
 
-	public HostHandshake(MessageConnection messageConnection, Listener listener, Handler handler)
+	public HostHandshake(MessageConnection messageConnection, Player hostPlayer, CribbageGame game, Listener listener, Handler handler)
 	{
-		if (messageConnection == null || listener == null || handler == null)
+		if (messageConnection == null || hostPlayer == null || game == null || listener == null || handler == null)
 		{
 			throw new IllegalArgumentException();
 		}
 
 		this.messageConnection = messageConnection;
+		this.hostPlayer = hostPlayer;
+		this.game = game;
 		this.listener = listener;
 		this.handler = handler;
 	}
@@ -85,7 +90,7 @@ public class HostHandshake
 		if (isRunning && outgoingResponse == null)
 		{
 			receivedRequest = requestMessage;
-			outgoingResponse = new JoinGameResponseMessage(true, "success");
+			outgoingResponse = new JoinGameAcceptedResponseMessage(new Player[]{hostPlayer, requestMessage.getPlayer()}, game);
 			messageConnection.send(outgoingResponse);
 			handler.postDelayed(timeoutRunnable, RESPONSE_TIMEOUT);
 		}
@@ -98,9 +103,8 @@ public class HostHandshake
 			if (error == null)
 			{
 				// Sent response acknowledged, so it's complete
-				Player player = new Player(receivedRequest.getPlayerName(), receivedRequest.getPlayerId());
 				privateStop();
-				listener.onReady(this, player);
+				listener.onReady(this, receivedRequest.getPlayer());
 			}
 			else
 			{

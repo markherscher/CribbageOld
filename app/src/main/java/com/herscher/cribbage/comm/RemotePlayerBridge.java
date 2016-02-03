@@ -9,6 +9,7 @@ import com.herscher.cribbage.RulesViolationException;
 import com.herscher.cribbage.comm.message.DiscardCardsMessage;
 import com.herscher.cribbage.comm.message.Message;
 import com.herscher.cribbage.comm.message.PlayCardMessage;
+import com.herscher.cribbage.comm.message.PlayerQuitMessage;
 import com.herscher.cribbage.model.PlayerBridge;
 
 import java.io.IOException;
@@ -79,6 +80,12 @@ public class RemotePlayerBridge implements PlayerBridge
 	}
 
 	@Override
+	public void notifyQuit(NotifyCompleteCallback callback)
+	{
+		sendMessage(new PlayerQuitMessage(player.getId()), callback);
+	}
+
+	@Override
 	public void close()
 	{
 		handler.post(new Runnable()
@@ -143,6 +150,16 @@ public class RemotePlayerBridge implements PlayerBridge
 			{
 				l.onCardsDiscarded(((DiscardCardsMessage) message).getCards());
 			}
+		}
+		else if (message instanceof PlayerQuitMessage)
+		{
+			for (Listener l : listeners)
+			{
+				l.onQuit();
+			}
+
+			// They quit, so close this
+			close();
 		}
 	}
 

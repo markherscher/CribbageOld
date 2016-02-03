@@ -2,9 +2,11 @@ package com.herscher.cribbage.comm;
 
 import android.os.Handler;
 
+import com.herscher.cribbage.CribbageGame;
 import com.herscher.cribbage.Player;
+import com.herscher.cribbage.comm.message.JoinGameRejectedResponseMessage;
 import com.herscher.cribbage.comm.message.JoinGameRequestMessage;
-import com.herscher.cribbage.comm.message.JoinGameResponseMessage;
+import com.herscher.cribbage.comm.message.JoinGameAcceptedResponseMessage;
 import com.herscher.cribbage.comm.message.Message;
 
 import java.io.IOException;
@@ -47,7 +49,7 @@ public class ClientHandshake
 				{
 					messageConnection.addListener(eventConnectionListener);
 					isRunning = true;
-					outgoingRequest = new JoinGameRequestMessage(1, player.getName(), player.getId());
+					outgoingRequest = new JoinGameRequestMessage(1, player);
 					messageConnection.send(outgoingRequest);
 				}
 			}
@@ -93,25 +95,27 @@ public class ClientHandshake
 			}
 			else
 			{
-
+				privateStop();
+				listener.onError(error);
 			}
 		}
 	}
 
-	private void handleResponseReceived(JoinGameResponseMessage responseMessage)
+	private void handleAcceptedResponseReceived(JoinGameAcceptedResponseMessage responseMessage)
 	{
 		if (isRunning)
 		{
 			privateStop();
+			listener.onReady(responseMessage.getPlayers(), responseMessage.getGame());
+		}
+	}
 
-			if (responseMessage.isAccepted())
-			{
-				listener.onReady();
-			}
-			else
-			{
-				listener.onDenied(responseMessage.getDescription());
-			}
+	private void handleRejectedResponseReceived(JoinGameRejectedResponseMessage responseMessage)
+	{
+		if (isRunning)
+		{
+			privateStop();
+			listener.onDenied(responseMessage.getReason());
 		}
 	}
 
@@ -138,9 +142,13 @@ public class ClientHandshake
 				@Override
 				public void run()
 				{
-					if (message instanceof JoinGameResponseMessage)
+					if (message instanceof JoinGameAcceptedResponseMessage)
 					{
-						handleResponseReceived((JoinGameResponseMessage) message);
+						handleAcceptedResponseReceived((JoinGameAcceptedResponseMessage) message);
+					}
+					else if (message instanceof JoinGameRejectedResponseMessage)
+					{
+						handleRejectedResponseReceived((JoinGameRejectedResponseMessage) message);
 					}
 				}
 			});
@@ -185,7 +193,7 @@ public class ClientHandshake
 
 	public interface Listener
 	{
-		void onReady();
+		void onReady(Player[] players, CribbageGame game);
 
 		void onDenied(String reason);
 

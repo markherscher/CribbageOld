@@ -19,9 +19,9 @@ public class RemoteMessageConnection implements MessageConnection
 
 	private final RemoteTransport transport;
 	private final MessageSerializer messageSerializer;
-	private final Queue<Message> outgoingQueue;
+	private final Queue<MessageCallbackPair> outgoingQueue;
 	private final List<Listener> listeners;
-	private Message eventBeingSent;
+	private MessageCallbackPair messagePairBeingSent;
 	private boolean isOpen;
 
 	public RemoteMessageConnection(RemoteTransport transport, MessageSerializer messageSerializer)
@@ -55,9 +55,9 @@ public class RemoteMessageConnection implements MessageConnection
 	}
 
 	@Override
-	public void send(Message event)
+	public synchronized void send(Message message, MessageSendCallback callback)
 	{
-		if (event == null)
+		if (message == null)
 		{
 			throw new IllegalArgumentException();
 		}
@@ -66,16 +66,13 @@ public class RemoteMessageConnection implements MessageConnection
 		{
 			synchronized (outgoingQueue)
 			{
-				outgoingQueue.add(event);
+				outgoingQueue.add(new MessageCallbackPair(message, callback));
 				trySendNext();
 			}
 		}
-		else
+		else if (callback != null)
 		{
-			for (Listener l : listeners)
-			{
-				l.onSendComplete(event, new IOException("not open"));
-			}
+			callback.onSendComplete(message, new IOException("connection is closed"));
 		}
 	}
 
@@ -86,44 +83,71 @@ public class RemoteMessageConnection implements MessageConnection
 	}
 
 	@Override
-	public void close()
+	public synchronized void close()
 	{
 		if (isOpen)
 		{
 			isOpen = false;
-			listeners.clear();
 			transport.close();
+
+			// Clear all outstanding messages
+			synchronized (outgoingQueue)
+			{
+				for (MessageCallbackPair pair : outgoingQueue)
+				{
+					if (pair.callback != null)
+					{
+						pair.callback.onSendComplete(pair.message, new IOException("connection is closed"));
+					}
+				}
+			}
 
 			for (Listener l : listeners)
 			{
 				l.onClosed();
 			}
+
+			outgoingQueue.clear();
+			listeners.clear();
 		}
 	}
 
 	private void trySendNext()
 	{
-		if (eventBeingSent != null)
+		if (messagePairBeingSent != null)
 		{
-			Message event = outgoingQueue.poll();
+			MessageCallbackPair next = outgoingQueue.poll();
 
-			if (event != null)
+			if (next != null)
 			{
 				byte[] rawBytes;
 
 				try
 				{
-					rawBytes = messageSerializer.serialize(event);
+					rawBytes = messageSerializer.serialize(next.message);
 				}
 				catch (IOException e)
 				{
-					Log.w(TAG, String.format("Failed to serialize event %s: %s", event.toString(), e.getMessage()));
+					Log.w(TAG, String.format("Failed to serialize event %s: %s", next.message.toString(), e.getMessage()));
 					trySendNext();
 					return;
 				}
 
+				messagePairBeingSent = next;
 				transport.startWrite(rawBytes);
 			}
+		}
+	}
+
+	private static class MessageCallbackPair
+	{
+		private final Message message;
+		private final MessageSendCallback callback;
+
+		public MessageCallbackPair(Message message, MessageSendCallback callback)
+		{
+			this.message = message;
+			this.callback = callback;
 		}
 	}
 
@@ -134,18 +158,18 @@ public class RemoteMessageConnection implements MessageConnection
 		{
 			if (isOpen)
 			{
-				Message sentEvent;
+				MessageCallbackPair sentPair;
 
 				synchronized (outgoingQueue)
 				{
-					sentEvent = eventBeingSent;
-					eventBeingSent = null;
+					sentPair = messagePairBeingSent;
+					messagePairBeingSent = null;
 					trySendNext();
 				}
 
-				for (Listener l : listeners)
+				if (sentPair != null && sentPair.callback != null)
 				{
-					l.onSendComplete(sentEvent, error);
+					sentPair.callback.onSendComplete(sentPair.message, error);
 				}
 			}
 		}
@@ -189,7 +213,7 @@ public class RemoteMessageConnection implements MessageConnection
 		@Override
 		public void onClosed()
 		{
-			// Do nothing
+			close();
 		}
 	};
 }

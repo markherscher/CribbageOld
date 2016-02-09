@@ -128,6 +128,7 @@ public class MainActivity extends Activity
 
 	private void restart()
 	{
+		/*
 		for (PlayerInfo pi : playerInfos)
 		{
 			pi.player.resetScore();
@@ -151,6 +152,7 @@ public class MainActivity extends Activity
 		game = null;
 		//game.addListener(this);
 		//game.startGame(cards);
+		*/
 	}
 
 	private void showEvent(String text)
@@ -182,6 +184,7 @@ public class MainActivity extends Activity
 
 	private void updateHandViews()
 	{
+		/*
 		LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
 		params.weight = 1.0f;
 		params.setMargins(10, 10, 10, 10);
@@ -201,6 +204,7 @@ public class MainActivity extends Activity
 				pi.cardsLayout.addView(cardView);
 			}
 		}
+		*/
 	}
 
 	/*
@@ -296,6 +300,7 @@ public class MainActivity extends Activity
 
 	private void discardCard(CardView cardView, Player player)
 	{
+		/*
 		for (PlayerInfo pi : playerInfos)
 		{
 			if (pi.player == player)
@@ -317,11 +322,12 @@ public class MainActivity extends Activity
 					}
 				}
 			}
-		}
+		}*/
 	}
 
 	private void playCard(CardView cardView, Player player)
 	{
+		/*
 		if (game.isCardLegalToPlay(cardView.getCard(), player))
 		{
 			try
@@ -337,6 +343,7 @@ public class MainActivity extends Activity
 		{
 			Toast.makeText(MainActivity.this, "That card is not legal to play", Toast.LENGTH_SHORT);
 		}
+		*/
 	}
 
 	private class PlayerInfo

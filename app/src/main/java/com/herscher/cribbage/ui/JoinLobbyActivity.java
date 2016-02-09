@@ -13,8 +13,6 @@ import java.io.IOException;
  */
 public class JoinLobbyActivity extends Activity
 {
-	private static ClientLobby clientLobby;
-
 	public static void setClientLobby(ClientLobby clientLobby)
 	{
 		JoinLobbyActivity.clientLobby = clientLobby;
@@ -31,24 +29,5 @@ public class JoinLobbyActivity extends Activity
 		}
 	}
 
-	private ClientLobby.Listener clientLobbyListener = new ClientLobby.Listener()
-	{
-		@Override
-		public void onGameJoined(PlayerBridge hostPlayerBridge, CribbageGame game)
-		{
 
-		}
-
-		@Override
-		public void onGameJoinRejection()
-		{
-
-		}
-
-		@Override
-		public void onGameJoinError(IOException error)
-		{
-
-		}
-	};
 }

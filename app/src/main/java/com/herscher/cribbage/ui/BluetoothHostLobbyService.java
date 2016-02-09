@@ -15,12 +15,10 @@ import com.herscher.cribbage.Player;
 import com.herscher.cribbage.comm.BluetoothConstants;
 import com.herscher.cribbage.comm.BluetoothRemoteLink;
 import com.herscher.cribbage.comm.FrameRemoteTransport;
-import com.herscher.cribbage.comm.HostLobby;
+import com.herscher.cribbage.comm.LobbyAccepter;
 import com.herscher.cribbage.comm.KryoMessageSerializer;
-import com.herscher.cribbage.comm.MessageConnection;
 import com.herscher.cribbage.comm.RemoteLink;
 import com.herscher.cribbage.comm.RemoteMessageConnection;
-import com.herscher.cribbage.comm.RemotePlayerBridge;
 import com.herscher.cribbage.model.LocalStuff;
 import com.herscher.cribbage.scoring.FifteensPlayScorer;
 import com.herscher.cribbage.scoring.PairsPlayScorer;
@@ -40,11 +38,7 @@ public class BluetoothHostLobbyService extends Service
 {
 	public interface Listener
 	{
-		void onPlayerJoined(Player player);
-
-		void onPlayerQuit(Player player);
-
-		void onErrorListening(IOException error);
+		void onListeningCompleted(RemoteMessageConnection connection, Player player, IOException error);
 	}
 
 	private final static String TAG = "BTHostLobbyService";
@@ -52,24 +46,19 @@ public class BluetoothHostLobbyService extends Service
 
 	private final IBinder binder = new Binder();
 	private final List<Listener> listeners = new CopyOnWriteArrayList<>();
-	private HostLobby hostLobby;
+	private Handler handler;
 	private ListenRunnable listenRunnable;
+
+	@Override
+	public void onCreate()
+	{
+		handler = new Handler();
+	}
 
 	@Override
 	public void onDestroy()
 	{
-		if (hostLobby != null)
-		{
-			hostLobby.clearLobby();
-			hostLobby.removeListener(hostLobbyListener);
-			hostLobby = null;
-		}
-
-		if (listenRunnable != null)
-		{
-			listenRunnable.stop();
-			listenRunnable = null;
-		}
+		stopListening();
 
 		listeners.clear();
 		super.onDestroy();
@@ -79,18 +68,6 @@ public class BluetoothHostLobbyService extends Service
 	@Override
 	public IBinder onBind(Intent intent)
 	{
-		CribbageGame game = createGame();
-		hostLobby = new HostLobby(LocalStuff.localPlayer, game, new Handler());
-		hostLobby.addListener(hostLobbyListener);
-
-		try
-		{
-			restartListenThread();
-		}
-		catch (IOException e)
-		{
-			Log.e(TAG, String.format("Error during auto-start of listen thread: %s", e.getMessage()));
-		}
 		return binder;
 	}
 
@@ -107,66 +84,55 @@ public class BluetoothHostLobbyService extends Service
 		listeners.remove(l);
 	}
 
-	public CribbageGame startGame()
-	{
-		if (getConnectedPlayerBridge() == null)
-		{
-			throw new IllegalStateException("no player connected");
-		}
-
-		hostLobby.startGame();
-		return hostLobby.getGame();
-	}
-
-	public RemotePlayerBridge getConnectedPlayerBridge()
-	{
-		return hostLobby == null ? null : hostLobby.getConnectedPlayerBridge();
-	}
-
 	public boolean isListening()
 	{
 		return listenRunnable != null;
 	}
 
-	public boolean restartListenThread() throws IOException
+	public boolean startListening()
 	{
-		if (listenRunnable != null)
+		// Only do anything if not already listening
+		if (listenRunnable == null)
 		{
-			listenRunnable.stop();
+			BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+
+			if (bluetoothAdapter == null)
+			{
+				return false;
+			}
+
+			BluetoothServerSocket serverSocket = null;
+			try
+			{
+				serverSocket = bluetoothAdapter.listenUsingRfcommWithServiceRecord(
+						"Cribbage Game 1", BluetoothConstants.RFCOMM_UUID);
+			}
+			catch (IOException e)
+			{
+				Log.e(TAG, String.format("Error creating RFCOMM listening socket: %s", e.getMessage()));
+				handleListeningComplete(null, null, new IOException("Error creating RFCOMM listening socket", e));
+			}
+
+			if (serverSocket != null)
+			{
+				listenRunnable = new ListenRunnable(serverSocket);
+				new Thread(listenRunnable, "BTHostLobbyService").start();
+			}
 		}
-
-		BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
-
-		if (bluetoothAdapter == null)
-		{
-			return false;
-		}
-
-		BluetoothServerSocket serverSocket = bluetoothAdapter.listenUsingRfcommWithServiceRecord(
-					"Cribbage Game 1", BluetoothConstants.RFCOMM_UUID);
-
-		listenRunnable = new ListenRunnable(serverSocket);
-		new Thread(listenRunnable, "BTHostLobbyService").start();
 
 		return true;
 	}
 
-	private void handleBluetoothConnected(BluetoothSocket bluetoothSocket)
+	public boolean stopListening()
 	{
-		RemoteLink remoteLink = null;
-
-		try
+		if (listenRunnable != null)
 		{
-			remoteLink = new BluetoothRemoteLink(bluetoothSocket);
-		}
-		catch (IOException e)
-		{
-			Log.e(TAG, String.format("Error creating BluetoothRemoteLink: %s", e.getMessage()));
+			listenRunnable.stop();
+			listenRunnable = null;
+			return true;
 		}
 
-		MessageConnection messageConnection = new RemoteMessageConnection(
-				new FrameRemoteTransport(remoteLink, new Handler()), new KryoMessageSerializer());
-		hostLobby.addConnection(messageConnection);
+		return false;
 	}
 
 	private CribbageGame createGame()
@@ -178,6 +144,24 @@ public class BluetoothHostLobbyService extends Service
 		return new CribbageGame(playScoreProcessor, showdownScoreProcessor, PLAYER_COUNT);
 	}
 
+	private void handleListeningComplete(final RemoteMessageConnection connection, final Player newPlayer, final IOException error)
+	{
+		handler.post(new Runnable()
+		{
+			@Override
+			public void run()
+			{
+				if (stopListening())
+				{
+					for (Listener l : listeners)
+					{
+						l.onListeningCompleted(connection, newPlayer, error);
+					}
+				}
+			}
+		});
+	}
+
 	public class Binder extends android.os.Binder
 	{
 		public BluetoothHostLobbyService getService()
@@ -186,75 +170,75 @@ public class BluetoothHostLobbyService extends Service
 		}
 	}
 
-	private HostLobby.Listener hostLobbyListener = new HostLobby.Listener()
-	{
-		@Override
-		public void onPlayerJoined(Player player)
-		{
-			for (Listener l : listeners)
-			{
-				l.onPlayerJoined(player);
-			}
-		}
-
-		@Override
-		public void onPlayerQuit(Player player)
-		{
-			for (Listener l : listeners)
-			{
-				l.onPlayerQuit(player);
-			}
-		}
-	};
-
 	private class ListenRunnable implements Runnable
 	{
 		private final BluetoothServerSocket serverSocket;
+		private final LobbyAccepter lobbyAccepter;
 		private boolean isOpen;
 
 		public ListenRunnable(BluetoothServerSocket serverSocket)
 		{
 			this.serverSocket = serverSocket;
+			lobbyAccepter = new LobbyAccepter(LocalStuff.localPlayer, createGame());
 			isOpen = true;
 		}
 
 		@Override
 		public void run()
 		{
-			while (isOpen)
+			BluetoothSocket socket = null;
+
+			try
 			{
-				BluetoothSocket socket = null;
-
-				try
+				socket = serverSocket.accept();
+			}
+			catch (final IOException e)
+			{
+				if (isOpen)
 				{
-					socket = serverSocket.accept();
-				}
-				catch (final IOException e)
-				{
-					if (isOpen)
-					{
-						Log.e(TAG, String.format("Error accepting Bluetooth socket: %s", e.getMessage()));
-						stop();
-
-						new Handler().post(new Runnable()
-						{
-							@Override
-							public void run()
-							{
-								for (Listener l : listeners)
-								{
-									l.onErrorListening(e);
-								}
-							}
-						});
-					}
-				}
-
-				if (socket != null)
-				{
-					handleBluetoothConnected(socket);
+					Log.e(TAG, String.format("Error accepting Bluetooth socket: %s", e.getMessage()));
+					handleListeningComplete(null, null, e);
 				}
 			}
+
+			if (!isOpen)
+			{
+				return;
+			}
+
+			RemoteLink remoteLink;
+			try
+			{
+				remoteLink = new BluetoothRemoteLink(socket);
+			}
+			catch (IOException e)
+			{
+				Log.e(TAG, String.format("Error creating BluetoothRemoteLink: %s", e.getMessage()));
+				handleListeningComplete(null, null, e);
+				return;
+			}
+
+			if (!isOpen)
+			{
+				return;
+			}
+
+			RemoteMessageConnection messageConnection = new RemoteMessageConnection(
+					new FrameRemoteTransport(remoteLink, new Handler()), new KryoMessageSerializer());
+
+			Player newPlayer;
+			try
+			{
+				newPlayer = lobbyAccepter.acceptConnection(messageConnection);
+			}
+			catch (IOException e)
+			{
+				Log.e(TAG, String.format("Error in lobbyAccepter: %s", e.getMessage()));
+				handleListeningComplete(null, null, e);
+				return;
+			}
+
+			handleListeningComplete(messageConnection, newPlayer, null);
 		}
 
 		public void stop()
@@ -262,6 +246,7 @@ public class BluetoothHostLobbyService extends Service
 			if (isOpen)
 			{
 				isOpen = false;
+				lobbyAccepter.cancelAccept();
 
 				try
 				{

@@ -1,35 +1,27 @@
 package com.herscher.cribbage.comm.message;
 
-import com.herscher.cribbage.CribbageGame;
-import com.herscher.cribbage.Player;
+import com.herscher.cribbage.comm.Lobby;
 
 /**
  * TODO add comments
  */
 public class JoinGameAcceptedResponseMessage extends Message
 {
-	private final Player[] players;
-	private final CribbageGame game;
+	private final Lobby lobby;
 
-	public JoinGameAcceptedResponseMessage(Player[] players, CribbageGame game)
+	public JoinGameAcceptedResponseMessage(Lobby lobby)
 	{
-		if (players == null || game == null)
+		if (lobby == null)
 		{
 			throw new IllegalArgumentException();
 		}
 
-		this.players = players;
-		this.game = game;
+		this.lobby = lobby;
 	}
 
-	public Player[] getPlayers()
+	public Lobby getLobby()
 	{
-		return players;
-	}
-
-	public CribbageGame getGame()
-	{
-		return game;
+		return lobby;
 	}
 
 	@Override

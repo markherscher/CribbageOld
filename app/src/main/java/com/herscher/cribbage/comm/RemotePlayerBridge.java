@@ -13,7 +13,6 @@ import com.herscher.cribbage.comm.message.PlayerQuitMessage;
 import com.herscher.cribbage.model.PlayerBridge;
 
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -27,7 +26,6 @@ public class RemotePlayerBridge implements PlayerBridge
 	private final Player player;
 	private final MessageConnection connection;
 	private final Handler handler;
-	private final HashMap<Message, NotifyCompleteCallback> sendCallbacks;
 	private final List<Listener> listeners;
 	private boolean isOpen;
 
@@ -41,7 +39,6 @@ public class RemotePlayerBridge implements PlayerBridge
 		this.player = player;
 		this.connection = connection;
 		this.handler = handler;
-		sendCallbacks = new HashMap<>();
 		listeners = new CopyOnWriteArrayList<>();
 		connection.addListener(new RemoteConnectionListener());
 	}
@@ -98,7 +95,6 @@ public class RemotePlayerBridge implements PlayerBridge
 					isOpen = false;
 					connection.close();
 					listeners.clear();
-					sendCallbacks.clear();
 
 					for (Listener l : listeners)
 					{
@@ -124,8 +120,7 @@ public class RemotePlayerBridge implements PlayerBridge
 			{
 				if (isOpen)
 				{
-					sendCallbacks.put(message, callback);
-					connection.send(message);
+					connection.send(message, new MessageSendCallback(callback));
 				}
 				else if (callback != null)
 				{
@@ -163,13 +158,18 @@ public class RemotePlayerBridge implements PlayerBridge
 		}
 	}
 
-	private class RemoteConnectionListener implements MessageConnection.Listener
+	private class MessageSendCallback implements MessageConnection.MessageSendCallback
 	{
-		@Override
-		public void onSendComplete(final Message event, final IOException error)
-		{
-			final NotifyCompleteCallback callback = sendCallbacks.remove(event);
+		private final NotifyCompleteCallback callback;
 
+		public MessageSendCallback(NotifyCompleteCallback callback)
+		{
+			this.callback = callback;
+		}
+
+		@Override
+		public void onSendComplete(Message message, final IOException error)
+		{
 			if (callback != null)
 			{
 				handler.post(new Runnable()
@@ -185,7 +185,10 @@ public class RemotePlayerBridge implements PlayerBridge
 				});
 			}
 		}
+	}
 
+	private class RemoteConnectionListener implements MessageConnection.Listener
+	{
 		@Override
 		public void onReceived(final Message event)
 		{

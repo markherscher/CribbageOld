@@ -12,6 +12,7 @@ public class Player
 {
 	private final String name;
 	private final long id;
+	private int slotNumber;
 
 	public Player(String name, long id)
 	{
@@ -32,6 +33,16 @@ public class Player
 	public long getId()
 	{
 		return id;
+	}
+
+	public int getSlotNumber()
+	{
+		return slotNumber;
+	}
+
+	public void setSlotNumber(int slotNumber)
+	{
+		this.slotNumber = slotNumber;
 	}
 
 	@Override

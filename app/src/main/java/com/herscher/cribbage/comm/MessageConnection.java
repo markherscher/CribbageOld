@@ -8,8 +8,6 @@ public interface MessageConnection
 {
 	interface Listener
 	{
-		void onSendComplete(Message message, IOException error);
-
 		void onReceived(Message message);
 
 		void onReceiveError(IOException error);
@@ -17,11 +15,16 @@ public interface MessageConnection
 		void onClosed();
 	}
 
+	interface MessageSendCallback
+	{
+		void onSendComplete(Message message, IOException error);
+	}
+
 	void addListener(Listener listener);
 
 	void removeListener(Listener listener);
 
-	void send(Message message);
+	void send(Message message, MessageSendCallback callback);
 
 	boolean isOpen();
 

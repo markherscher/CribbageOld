@@ -9,10 +9,6 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.util.Log;
-import android.view.View;
-import android.widget.ArrayAdapter;
-import android.widget.Button;
-import android.widget.ListView;
 
 import com.herscher.cribbage.Player;
 import com.herscher.cribbage.R;
@@ -20,27 +16,22 @@ import com.herscher.cribbage.comm.MessageConnection;
 import com.herscher.cribbage.comm.RemoteMessageConnection;
 import com.herscher.cribbage.comm.message.Message;
 import com.herscher.cribbage.comm.message.PlayerQuitMessage;
+import com.herscher.cribbage.model.LocalStuff;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * TODO add comments
  */
-public class HostLobbyActivity extends Activity implements View.OnClickListener
+public class HostLobbyActivity extends Activity
 {
 	private static final String TAG = "HostLobbyActivity";
 
-	private final List<String> playerList = new ArrayList<>();
-	private ArrayAdapter<String> playerListAdapter;
 	private BluetoothHostLobbyService bluetoothService;
 	private Handler handler;
 	private Player player;
 	private RemoteMessageConnection connection;
-	private ListView playerListView;
-	private Button startButton;
-	private Button cancelButton;
+	private LobbyFragment lobbyFragment;
 
 	@Override
 	public void onCreate(Bundle savedInstanceState)
@@ -48,15 +39,10 @@ public class HostLobbyActivity extends Activity implements View.OnClickListener
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.host_lobby_activity);
 
-		playerListView = (ListView) findViewById(R.id.playerList);
-		startButton = (Button) findViewById(R.id.startButton);
-		cancelButton = (Button) findViewById(R.id.cancelButton);
+		lobbyFragment = (LobbyFragment) getFragmentManager().findFragmentById(R.id.lobbyFragment);
 		handler = new Handler();
-		playerListAdapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, playerList);
 
-		startButton.setOnClickListener(this);
-		cancelButton.setOnClickListener(this);
-
+		lobbyFragment.setListener(lobbyFragmentListener);
 		bindBluetoothService();
 	}
 
@@ -67,20 +53,25 @@ public class HostLobbyActivity extends Activity implements View.OnClickListener
 
 		// Going away, so no need for a connection to the service
 		unbindBluetoothService();
+		lobbyFragment.setListener(null);
 	}
 
-	@Override
-	public void onClick(View v)
+	private LobbyFragment.Listener lobbyFragmentListener = new LobbyFragment.Listener()
 	{
-		if (v == startButton)
+		@Override
+		public void onStartClicked()
 		{
-
+			Log.i(TAG, "Start clicked");
 		}
-		else if (v == cancelButton)
+
+		@Override
+		public void onCancelClicked()
 		{
+			Log.i(TAG, "Cancel clicked");
+
 			unbindBluetoothService();
 		}
-	}
+	};
 
 	private void bindBluetoothService()
 	{
@@ -89,18 +80,25 @@ public class HostLobbyActivity extends Activity implements View.OnClickListener
 
 	private void unbindBluetoothService()
 	{
-		unbindService(bluetoothHostLobbyServiceConnection);
+		try
+		{
+			unbindService(bluetoothHostLobbyServiceConnection);
+		}
+		catch (IllegalArgumentException e)
+		{
+			// Oh well
+		}
 	}
 
 	private void startListeningIfNecessary()
 	{
-		if (player == null)
+		try
 		{
-			// No connected player, so start listening
-			if (!bluetoothService.startListening())
-			{
-				// TODO: handle bluetooth being disabled
-			}
+			bluetoothService.startListening();
+		}
+		catch (IOException e)
+		{
+			e.printStackTrace();
 		}
 	}
 
@@ -112,6 +110,7 @@ public class HostLobbyActivity extends Activity implements View.OnClickListener
 			this.connection = connection;
 
 			this.connection.addListener(connectionListener);
+			lobbyFragment.setPlayers(LocalStuff.localPlayer, player);
 		}
 	}
 
@@ -124,19 +123,33 @@ public class HostLobbyActivity extends Activity implements View.OnClickListener
 			player = null;
 		}
 
-		startListeningIfNecessary();
+		lobbyFragment.setPlayers(LocalStuff.localPlayer, null);
 	}
 
 	private BluetoothHostLobbyService.Listener bluetoothServiceListener = new BluetoothHostLobbyService.Listener()
 	{
 		@Override
-		public void onListeningCompleted(RemoteMessageConnection connection, Player player, IOException error)
+		public void onPlayerJoined()
 		{
-			// Don't care if there was an error
-			if (error == null)
-			{
-				handlePlayerJoined(connection, player);
-			}
+
+		}
+
+		@Override
+		public void onPlayerQuit()
+		{
+
+		}
+
+		@Override
+		public void onHostingStopped(IOException cause)
+		{
+
+		}
+
+		@Override
+		public void onBluetoothDisabled()
+		{
+
 		}
 	};
 
@@ -145,6 +158,8 @@ public class HostLobbyActivity extends Activity implements View.OnClickListener
 		@Override
 		public void onServiceConnected(ComponentName name, IBinder service)
 		{
+			Log.i(TAG, "Connection established to BluetoothHostLobbyService");
+
 			bluetoothService = ((BluetoothHostLobbyService.Binder) service).getService();
 			bluetoothService.addListener(bluetoothServiceListener);
 			startListeningIfNecessary();
@@ -153,7 +168,8 @@ public class HostLobbyActivity extends Activity implements View.OnClickListener
 		@Override
 		public void onServiceDisconnected(ComponentName name)
 		{
-			// Right now it's dead
+			Log.i(TAG, "Connection lost to BluetoothHostLobbyService");
+
 			bluetoothService.removeListener(bluetoothServiceListener);
 			bluetoothService = null;
 		}

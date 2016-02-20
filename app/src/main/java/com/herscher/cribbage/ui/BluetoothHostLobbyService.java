@@ -3,7 +3,6 @@ package com.herscher.cribbage.ui;
 import android.app.Service;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothServerSocket;
-import android.bluetooth.BluetoothSocket;
 import android.content.Intent;
 import android.os.Handler;
 import android.os.IBinder;
@@ -13,12 +12,9 @@ import android.util.Log;
 import com.herscher.cribbage.CribbageGame;
 import com.herscher.cribbage.Player;
 import com.herscher.cribbage.comm.BluetoothConstants;
-import com.herscher.cribbage.comm.BluetoothRemoteLink;
-import com.herscher.cribbage.comm.FrameRemoteTransport;
-import com.herscher.cribbage.comm.LobbyAccepter;
-import com.herscher.cribbage.comm.KryoMessageSerializer;
-import com.herscher.cribbage.comm.RemoteLink;
+import com.herscher.cribbage.comm.HostBluetoothLobby;
 import com.herscher.cribbage.comm.RemoteMessageConnection;
+import com.herscher.cribbage.comm.RemotePlayerBridge;
 import com.herscher.cribbage.model.LocalStuff;
 import com.herscher.cribbage.scoring.FifteensPlayScorer;
 import com.herscher.cribbage.scoring.PairsPlayScorer;
@@ -28,8 +24,8 @@ import com.herscher.cribbage.scoring.ShowdownScoreProcessor;
 import com.herscher.cribbage.scoring.StandardShowdownScoreProcessor;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * TODO add comments
@@ -38,27 +34,47 @@ public class BluetoothHostLobbyService extends Service
 {
 	public interface Listener
 	{
-		void onListeningCompleted(RemoteMessageConnection connection, Player player, IOException error);
+		void onPlayerJoined();
+
+		void onPlayerQuit();
+
+		void onHostingStopped(IOException cause);
+
+		void onBluetoothDisabled();
 	}
 
 	private final static String TAG = "BTHostLobbyService";
 	private final static int PLAYER_COUNT = 2;
 
 	private final IBinder binder = new Binder();
-	private final List<Listener> listeners = new CopyOnWriteArrayList<>();
+	private final List<Listener> listeners = new ArrayList<>();
 	private Handler handler;
-	private ListenRunnable listenRunnable;
+	private HostBluetoothLobby hostBluetoothLobby;
+	private BluetoothServerSocket serverSocket;
 
 	@Override
 	public void onCreate()
 	{
 		handler = new Handler();
+		hostBluetoothLobby = new HostBluetoothLobby(LocalStuff.localPlayer, handler, lobbyListener);
 	}
 
 	@Override
 	public void onDestroy()
 	{
 		stopListening();
+
+		if (serverSocket != null)
+		{
+			try
+			{
+				serverSocket.close();
+			}
+			catch (IOException e)
+			{
+				// Oh well
+			}
+		}
 
 		listeners.clear();
 		super.onDestroy();
@@ -86,53 +102,56 @@ public class BluetoothHostLobbyService extends Service
 
 	public boolean isListening()
 	{
-		return listenRunnable != null;
+		return hostBluetoothLobby.isHosting();
 	}
 
-	public boolean startListening()
+	public boolean startListening() throws IOException
 	{
-		// Only do anything if not already listening
-		if (listenRunnable == null)
+		if (serverSocket == null)
 		{
-			BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
-
-			if (bluetoothAdapter == null)
-			{
-				return false;
-			}
-
-			BluetoothServerSocket serverSocket = null;
 			try
 			{
-				serverSocket = bluetoothAdapter.listenUsingRfcommWithServiceRecord(
-						"Cribbage Game 1", BluetoothConstants.RFCOMM_UUID);
+				serverSocket = openServerSocket();
 			}
 			catch (IOException e)
 			{
 				Log.e(TAG, String.format("Error creating RFCOMM listening socket: %s", e.getMessage()));
-				handleListeningComplete(null, null, new IOException("Error creating RFCOMM listening socket", e));
+				throw e;
 			}
 
-			if (serverSocket != null)
+			if (serverSocket == null)
 			{
-				listenRunnable = new ListenRunnable(serverSocket);
-				new Thread(listenRunnable, "BTHostLobbyService").start();
+				for (Listener l : listeners)
+				{
+					l.onBluetoothDisabled();
+				}
+				return false;
 			}
 		}
 
-		return true;
+		return hostBluetoothLobby.startHosting(serverSocket, createGame());
 	}
 
 	public boolean stopListening()
 	{
-		if (listenRunnable != null)
+		return hostBluetoothLobby.stopHosting();
+	}
+
+	public HostBluetoothLobby.PlayerConnection getConnectedPlayer()
+	{
+		return hostBluetoothLobby.getConnectedPlayer();
+	}
+
+	private BluetoothServerSocket openServerSocket() throws IOException
+	{
+		BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+
+		if (bluetoothAdapter == null)
 		{
-			listenRunnable.stop();
-			listenRunnable = null;
-			return true;
+			return null;
 		}
 
-		return false;
+		return bluetoothAdapter.listenUsingRfcommWithServiceRecord("Cribbage Game 1", BluetoothConstants.RFCOMM_UUID);
 	}
 
 	private CribbageGame createGame()
@@ -144,24 +163,6 @@ public class BluetoothHostLobbyService extends Service
 		return new CribbageGame(playScoreProcessor, showdownScoreProcessor, PLAYER_COUNT);
 	}
 
-	private void handleListeningComplete(final RemoteMessageConnection connection, final Player newPlayer, final IOException error)
-	{
-		handler.post(new Runnable()
-		{
-			@Override
-			public void run()
-			{
-				if (stopListening())
-				{
-					for (Listener l : listeners)
-					{
-						l.onListeningCompleted(connection, newPlayer, error);
-					}
-				}
-			}
-		});
-	}
-
 	public class Binder extends android.os.Binder
 	{
 		public BluetoothHostLobbyService getService()
@@ -170,93 +171,54 @@ public class BluetoothHostLobbyService extends Service
 		}
 	}
 
-	private class ListenRunnable implements Runnable
+	private HostBluetoothLobby.Listener lobbyListener = new HostBluetoothLobby.Listener()
 	{
-		private final BluetoothServerSocket serverSocket;
-		private final LobbyAccepter lobbyAccepter;
-		private boolean isOpen;
-
-		public ListenRunnable(BluetoothServerSocket serverSocket)
+		@Override
+		public void onPlayerJoined(final HostBluetoothLobby.PlayerConnection playerConnection)
 		{
-			this.serverSocket = serverSocket;
-			lobbyAccepter = new LobbyAccepter(LocalStuff.localPlayer, createGame());
-			isOpen = true;
+			handler.post(new Runnable()
+			{
+				@Override
+				public void run()
+				{
+					for (Listener l : listeners)
+					{
+						l.onPlayerJoined();
+					}
+				}
+			});
 		}
 
 		@Override
-		public void run()
+		public void onPlayerQuit(final HostBluetoothLobby.PlayerConnection playerConnection)
 		{
-			BluetoothSocket socket = null;
-
-			try
+			handler.post(new Runnable()
 			{
-				socket = serverSocket.accept();
-			}
-			catch (final IOException e)
-			{
-				if (isOpen)
+				@Override
+				public void run()
 				{
-					Log.e(TAG, String.format("Error accepting Bluetooth socket: %s", e.getMessage()));
-					handleListeningComplete(null, null, e);
+					for (Listener l : listeners)
+					{
+						l.onPlayerQuit();
+					}
 				}
-			}
-
-			if (!isOpen)
-			{
-				return;
-			}
-
-			RemoteLink remoteLink;
-			try
-			{
-				remoteLink = new BluetoothRemoteLink(socket);
-			}
-			catch (IOException e)
-			{
-				Log.e(TAG, String.format("Error creating BluetoothRemoteLink: %s", e.getMessage()));
-				handleListeningComplete(null, null, e);
-				return;
-			}
-
-			if (!isOpen)
-			{
-				return;
-			}
-
-			RemoteMessageConnection messageConnection = new RemoteMessageConnection(
-					new FrameRemoteTransport(remoteLink, new Handler()), new KryoMessageSerializer());
-
-			Player newPlayer;
-			try
-			{
-				newPlayer = lobbyAccepter.acceptConnection(messageConnection);
-			}
-			catch (IOException e)
-			{
-				Log.e(TAG, String.format("Error in lobbyAccepter: %s", e.getMessage()));
-				handleListeningComplete(null, null, e);
-				return;
-			}
-
-			handleListeningComplete(messageConnection, newPlayer, null);
+			});
 		}
 
-		public void stop()
+		@Override
+		public void onHostingStopped(final IOException cause)
 		{
-			if (isOpen)
+			handler.post(new Runnable()
 			{
-				isOpen = false;
-				lobbyAccepter.cancelAccept();
-
-				try
+				@Override
+				public void run()
 				{
-					serverSocket.close();
+					for (Listener l : listeners)
+					{
+						l.onHostingStopped(cause);
+					}
 				}
-				catch (IOException e)
-				{
-					// Oh well
-				}
-			}
+			});
 		}
-	}
+	};
 }

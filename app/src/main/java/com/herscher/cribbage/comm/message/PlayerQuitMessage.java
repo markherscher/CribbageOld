@@ -1,19 +1,26 @@
 package com.herscher.cribbage.comm.message;
 
+import com.herscher.cribbage.Player;
+
 /**
  * TODO add comments
  */
 public class PlayerQuitMessage extends Message
 {
-	private final long playerId;
+	private final Player player;
 
-	public PlayerQuitMessage(long playerId)
+	public PlayerQuitMessage(Player player)
 	{
-		this.playerId = playerId;
+		if (player == null)
+		{
+			throw new IllegalArgumentException();
+		}
+
+		this.player = player;
 	}
 
-	public long getPlayerId()
+	public Player getPlayer()
 	{
-		return playerId;
+		return player;
 	}
 }

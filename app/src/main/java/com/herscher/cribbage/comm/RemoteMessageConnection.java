@@ -23,6 +23,7 @@ public class RemoteMessageConnection implements MessageConnection
 	private final List<Listener> listeners;
 	private MessageCallbackPair messagePairBeingSent;
 	private boolean isOpen;
+	private boolean closeWhenEmpty;
 
 	public RemoteMessageConnection(RemoteTransport transport, MessageSerializer messageSerializer)
 	{
@@ -112,9 +113,33 @@ public class RemoteMessageConnection implements MessageConnection
 		}
 	}
 
+	public synchronized void setCloseWhenEmpty(boolean shouldClose)
+	{
+		if (isOpen)
+		{
+			closeWhenEmpty = shouldClose;
+
+			if (closeWhenEmpty)
+			{
+				// Kick the queue to check it
+				synchronized (outgoingQueue)
+				{
+					trySendNext();
+				}
+			}
+		}
+	}
+
+	public boolean getCloseWhenEmpty()
+	{
+		return closeWhenEmpty;
+	}
+
 	private void trySendNext()
 	{
-		if (messagePairBeingSent != null)
+		boolean isEmpty = false;
+
+		if (messagePairBeingSent == null)
 		{
 			MessageCallbackPair next = outgoingQueue.poll();
 
@@ -136,6 +161,15 @@ public class RemoteMessageConnection implements MessageConnection
 				messagePairBeingSent = next;
 				transport.startWrite(rawBytes);
 			}
+			else
+			{
+				isEmpty = true;
+			}
+		}
+
+		if (isEmpty && closeWhenEmpty)
+		{
+			close();
 		}
 	}
 

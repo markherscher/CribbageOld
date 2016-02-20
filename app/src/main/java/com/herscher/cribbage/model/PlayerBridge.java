@@ -20,7 +20,7 @@ public interface PlayerBridge
 
 	void notifyRulesViolation(RulesViolationException error, NotifyCompleteCallback callback);
 
-	void notifyQuit(NotifyCompleteCallback callback);
+	void notifyQuit(Player quittingPlayer, NotifyCompleteCallback callback);
 
 	void close();
 

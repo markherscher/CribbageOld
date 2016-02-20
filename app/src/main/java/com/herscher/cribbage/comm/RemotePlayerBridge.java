@@ -77,9 +77,9 @@ public class RemotePlayerBridge implements PlayerBridge
 	}
 
 	@Override
-	public void notifyQuit(NotifyCompleteCallback callback)
+	public void notifyQuit(Player quittingPlayer, NotifyCompleteCallback callback)
 	{
-		sendMessage(new PlayerQuitMessage(player.getId()), callback);
+		sendMessage(new PlayerQuitMessage(quittingPlayer), callback);
 	}
 
 	@Override
@@ -93,7 +93,7 @@ public class RemotePlayerBridge implements PlayerBridge
 				if (isOpen)
 				{
 					isOpen = false;
-					connection.close();
+					connection.setCloseWhenEmpty(true);
 					listeners.clear();
 
 					for (Listener l : listeners)

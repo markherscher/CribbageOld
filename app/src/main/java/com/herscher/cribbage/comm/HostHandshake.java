@@ -90,8 +90,23 @@ public class HostHandshake
 		if (isRunning && outgoingResponse == null)
 		{
 			receivedRequest = requestMessage;
-			outgoingResponse = new JoinGameAcceptedResponseMessage(new Player[]{hostPlayer, requestMessage.getPlayer()}, game);
-			messageConnection.send(outgoingResponse);
+			Lobby lobby = new Lobby(hostPlayer, requestMessage.getPlayer(), game);
+			outgoingResponse = new JoinGameAcceptedResponseMessage(lobby);
+			messageConnection.send(outgoingResponse, new MessageConnection.MessageSendCallback()
+			{
+				@Override
+				public void onSendComplete(final Message message, final IOException error)
+				{
+					handler.post(new Runnable()
+					{
+						@Override
+						public void run()
+						{
+							handleResponseSendComplete(message, error);
+						}
+					});
+				}
+			});
 			handler.postDelayed(timeoutRunnable, RESPONSE_TIMEOUT);
 		}
 	}
@@ -129,19 +144,6 @@ public class HostHandshake
 
 	private MessageConnection.Listener remoteConnectionListener = new MessageConnection.Listener()
 	{
-		@Override
-		public void onSendComplete(final Message message, final IOException error)
-		{
-			handler.post(new Runnable()
-			{
-				@Override
-				public void run()
-				{
-					handleResponseSendComplete(message, error);
-				}
-			});
-		}
-
 		@Override
 		public void onReceived(final Message message)
 		{

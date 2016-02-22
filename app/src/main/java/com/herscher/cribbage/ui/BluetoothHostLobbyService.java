@@ -10,11 +10,8 @@ import android.support.annotation.Nullable;
 import android.util.Log;
 
 import com.herscher.cribbage.CribbageGame;
-import com.herscher.cribbage.Player;
 import com.herscher.cribbage.comm.BluetoothConstants;
 import com.herscher.cribbage.comm.HostBluetoothLobby;
-import com.herscher.cribbage.comm.RemoteMessageConnection;
-import com.herscher.cribbage.comm.RemotePlayerBridge;
 import com.herscher.cribbage.model.LocalStuff;
 import com.herscher.cribbage.scoring.FifteensPlayScorer;
 import com.herscher.cribbage.scoring.PairsPlayScorer;
@@ -34,9 +31,9 @@ public class BluetoothHostLobbyService extends Service
 {
 	public interface Listener
 	{
-		void onPlayerJoined();
+		void onPlayerJoined(HostBluetoothLobby.PlayerConnection playerConnection);
 
-		void onPlayerQuit();
+		void onPlayerQuit(HostBluetoothLobby.PlayerConnection playerConnection);
 
 		void onHostingStopped(IOException cause);
 
@@ -146,7 +143,7 @@ public class BluetoothHostLobbyService extends Service
 	{
 		BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
 
-		if (bluetoothAdapter == null)
+		if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled())
 		{
 			return null;
 		}
@@ -183,7 +180,7 @@ public class BluetoothHostLobbyService extends Service
 				{
 					for (Listener l : listeners)
 					{
-						l.onPlayerJoined();
+						l.onPlayerJoined(playerConnection);
 					}
 				}
 			});
@@ -199,7 +196,7 @@ public class BluetoothHostLobbyService extends Service
 				{
 					for (Listener l : listeners)
 					{
-						l.onPlayerQuit();
+						l.onPlayerQuit(playerConnection);
 					}
 				}
 			});

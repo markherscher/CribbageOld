@@ -276,6 +276,7 @@ public class HostBluetoothLobby
 		{
 			if (stopHosting())
 			{
+				Log.e(TAG, String.format("Error recieved: %s", error.getMessage()));
 				listener.onHostingStopped(error);
 			}
 		}

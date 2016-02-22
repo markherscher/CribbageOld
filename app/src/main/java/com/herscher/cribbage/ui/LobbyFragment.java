@@ -6,19 +6,16 @@ import android.content.Context;
 import android.content.res.TypedArray;
 import android.os.Bundle;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
-import android.widget.ListView;
 import android.widget.TextView;
 
 import com.herscher.cribbage.Player;
 import com.herscher.cribbage.R;
 
 import java.lang.ref.WeakReference;
-import java.util.Collection;
 
 /**
  * TODO add comments
@@ -50,24 +47,14 @@ public class LobbyFragment extends Fragment
 	}
 
 	@Override
-	public void onCreate(Bundle savedInstanceState)
-	{
-		Log.i(TAG, "onCreate");
-		super.onCreate(savedInstanceState);
-	}
-
-	@Override
 	public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState)
 	{
-		Log.i(TAG, "onCreateView");
 		return inflater.inflate(R.layout.lobby_fragment, container, false);
 	}
 
 	@Override
 	public void onViewCreated(View rootView, Bundle savedInstanceState)
 	{
-		Log.i(TAG, "onViewCreated");
-
 		hostPlayerTextView = (TextView) rootView.findViewById(R.id.hostPlayerTextView);
 		clientPlayerTextView = (TextView) rootView.findViewById(R.id.clientPlayerTextView);
 		startButton = (Button) rootView.findViewById(R.id.startButton);
@@ -83,7 +70,6 @@ public class LobbyFragment extends Fragment
 	@Override
 	public void onDetach()
 	{
-		Log.i(TAG, "onDetach");
 		if (startButton != null)
 		{
 			startButton.setOnClickListener(null);

@@ -6,16 +6,12 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.os.Bundle;
-import android.os.Handler;
 import android.os.IBinder;
 import android.util.Log;
+import android.widget.Toast;
 
-import com.herscher.cribbage.Player;
 import com.herscher.cribbage.R;
-import com.herscher.cribbage.comm.MessageConnection;
-import com.herscher.cribbage.comm.RemoteMessageConnection;
-import com.herscher.cribbage.comm.message.Message;
-import com.herscher.cribbage.comm.message.PlayerQuitMessage;
+import com.herscher.cribbage.comm.HostBluetoothLobby;
 import com.herscher.cribbage.model.LocalStuff;
 
 import java.io.IOException;
@@ -27,10 +23,10 @@ public class HostLobbyActivity extends Activity
 {
 	private static final String TAG = "HostLobbyActivity";
 
+	// Look at what needs to go into the fragment. Remember I will lose everything on create,
+	// namely connected player
+
 	private BluetoothHostLobbyService bluetoothService;
-	private Handler handler;
-	private Player player;
-	private RemoteMessageConnection connection;
 	private LobbyFragment lobbyFragment;
 
 	@Override
@@ -40,7 +36,6 @@ public class HostLobbyActivity extends Activity
 		setContentView(R.layout.host_lobby_activity);
 
 		lobbyFragment = (LobbyFragment) getFragmentManager().findFragmentById(R.id.lobbyFragment);
-		handler = new Handler();
 
 		lobbyFragment.setListener(lobbyFragmentListener);
 		bindBluetoothService();
@@ -68,14 +63,14 @@ public class HostLobbyActivity extends Activity
 		public void onCancelClicked()
 		{
 			Log.i(TAG, "Cancel clicked");
-
 			unbindBluetoothService();
 		}
 	};
 
 	private void bindBluetoothService()
 	{
-		bindService(new Intent(this, BluetoothHostLobbyService.class), bluetoothHostLobbyServiceConnection, Context.BIND_AUTO_CREATE);
+		bindService(new Intent(this, BluetoothHostLobbyService.class),
+				bluetoothHostLobbyServiceConnection, Context.BIND_AUTO_CREATE);
 	}
 
 	private void unbindBluetoothService()
@@ -98,60 +93,52 @@ public class HostLobbyActivity extends Activity
 		}
 		catch (IOException e)
 		{
+			// TODO: display error dialog
 			e.printStackTrace();
+			Toast.makeText(this, "Error while starting listening", Toast.LENGTH_LONG).show();
 		}
 	}
 
-	private void handlePlayerJoined(RemoteMessageConnection connection, Player player)
+	private void handlePlayerJoined(HostBluetoothLobby.PlayerConnection playerConnection)
 	{
-		if (connection != null && player != null)
-		{
-			this.player = player;
-			this.connection = connection;
-
-			this.connection.addListener(connectionListener);
-			lobbyFragment.setPlayers(LocalStuff.localPlayer, player);
-		}
+		lobbyFragment.setPlayers(LocalStuff.localPlayer, playerConnection.getPlayer());
 	}
 
 	private void handlePlayerQuit()
 	{
-		if (connection != null)
-		{
-			connection.removeListener(connectionListener);
-			connection = null;
-			player = null;
-		}
-
 		lobbyFragment.setPlayers(LocalStuff.localPlayer, null);
 	}
 
-	private BluetoothHostLobbyService.Listener bluetoothServiceListener = new BluetoothHostLobbyService.Listener()
-	{
-		@Override
-		public void onPlayerJoined()
-		{
+	private BluetoothHostLobbyService.Listener bluetoothServiceListener = new
+			BluetoothHostLobbyService.Listener()
+			{
+				@Override
+				public void onPlayerJoined(HostBluetoothLobby.PlayerConnection playerConnection)
+				{
+					handlePlayerJoined(playerConnection);
+				}
 
-		}
+				@Override
+				public void onPlayerQuit(HostBluetoothLobby.PlayerConnection playerConnection)
+				{
+					handlePlayerQuit();
+				}
 
-		@Override
-		public void onPlayerQuit()
-		{
+				@Override
+				public void onHostingStopped(IOException cause)
+				{
+					Toast.makeText(HostLobbyActivity.this, "An exception occurred while hosting",
+							Toast.LENGTH_LONG).show();
+					// TODO: What to do? Exit the activity? Probably so.
+				}
 
-		}
-
-		@Override
-		public void onHostingStopped(IOException cause)
-		{
-
-		}
-
-		@Override
-		public void onBluetoothDisabled()
-		{
-
-		}
-	};
+				@Override
+				public void onBluetoothDisabled()
+				{
+					Toast.makeText(HostLobbyActivity.this, "You must enable Bluetooth",
+							Toast.LENGTH_LONG).show();
+				}
+			};
 
 	private ServiceConnection bluetoothHostLobbyServiceConnection = new ServiceConnection()
 	{
@@ -172,55 +159,6 @@ public class HostLobbyActivity extends Activity
 
 			bluetoothService.removeListener(bluetoothServiceListener);
 			bluetoothService = null;
-		}
-	};
-
-	private RemoteMessageConnection.Listener connectionListener = new MessageConnection.Listener()
-	{
-		@Override
-		public void onReceived(Message message)
-		{
-			if (message instanceof PlayerQuitMessage)
-			{
-				handler.post(new Runnable()
-				{
-					@Override
-					public void run()
-					{
-						handlePlayerQuit();
-					}
-				});
-			}
-		}
-
-		@Override
-		public void onReceiveError(IOException error)
-		{
-			Log.w(TAG, String.format("Disconnecting due to receive error: %s", error.getMessage()));
-
-			handler.post(new Runnable()
-			{
-				@Override
-				public void run()
-				{
-					handlePlayerQuit();
-				}
-			});
-		}
-
-		@Override
-		public void onClosed()
-		{
-			Log.w(TAG, "MessageConnection unexpectedly closed");
-
-			handler.post(new Runnable()
-			{
-				@Override
-				public void run()
-				{
-					handlePlayerQuit();
-				}
-			});
 		}
 	};
 }

@@ -9,78 +9,19 @@
               android:paddingTop="@dimen/activity_vertical_margin"
               tools:context=".MainActivity">
 
-    <LinearLayout
-        android:layout_width="match_parent"
+    <Button
+        android:id="@+id/hostButton"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:background="#AAAAAA"
-        android:orientation="horizontal">
+        android:layout_gravity="center_horizontal"
+        android:text="Host"/>
 
-        <TextView
-            android:id="@+id/player1Score"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Player 1: 0"/>
-
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"/>
-
-        <TextView
-            android:id="@+id/player2Score"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Player 2: 0"/>
-    </LinearLayout>
-
-    <LinearLayout
-        android:layout_width="match_parent"
+    <Button
+        android:id="@+id/joinButton"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:background="#AAAAAA"
-        android:orientation="horizontal">
-
-        <TextView
-            android:id="@+id/playCount"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Count: 0"/>
-
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"/>
-
-        <TextView
-            android:id="@+id/state"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text=""/>
-    </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/player1Cards"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"></LinearLayout>
-
-    <ScrollView
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1">
-
-        <TextView
-            android:id="@+id/eventsList"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:background="#CCCCCC"
-            android:text="Testing"/>
-    </ScrollView>
-
-    <LinearLayout
-        android:id="@+id/player2Cards"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"></LinearLayout>
+        android:layout_gravity="center_horizontal"
+        android:text="Join"/>
 
 
 </LinearLayout>

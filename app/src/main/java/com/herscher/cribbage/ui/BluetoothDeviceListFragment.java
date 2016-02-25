@@ -42,6 +42,8 @@ public class BluetoothDeviceListFragment extends Fragment
 		gameListView = (ListView) rootView.findViewById(R.id.gameListView);
 		deviceListAdapter = new ArrayAdapter<>(getActivity(), android.R.layout.simple_list_item_1,
 				deviceList);
+
+		gameListView.setAdapter(deviceListAdapter);
 	}
 
 	@Override

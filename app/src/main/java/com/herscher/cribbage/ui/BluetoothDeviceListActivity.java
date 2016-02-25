@@ -42,10 +42,17 @@ public class BluetoothDeviceListActivity extends Activity
 
 		refreshButton.setOnClickListener(clickListener);
 
-		registerReceiver(bluetoothBroadcastReceiver,
-				new IntentFilter(BluetoothDevice.ACTION_FOUND));
-		registerReceiver(bluetoothBroadcastReceiver,
-				new IntentFilter(BluetoothAdapter.ACTION_DISCOVERY_FINISHED));
+		IntentFilter filter = new IntentFilter();
+		filter.addAction(BluetoothDevice.ACTION_FOUND);
+		filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
+		registerReceiver(bluetoothBroadcastReceiver, filter);
+
+		BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+
+		if (bluetoothAdapter != null && bluetoothAdapter.isDiscovering())
+		{
+			refreshButton.setEnabled(false);
+		}
 	}
 
 	@Override
@@ -83,7 +90,7 @@ public class BluetoothDeviceListActivity extends Activity
 		else
 		{
 			bluetoothAdapter.cancelDiscovery();
-			bluetoothAdapter.startDiscovery();
+			boolean result = bluetoothAdapter.startDiscovery();
 			deviceListFragment.clearBluetoothDevices();
 		}
 	}

@@ -81,6 +81,15 @@ public class BluetoothHostLobbyService extends Service
 	@Override
 	public IBinder onBind(Intent intent)
 	{
+		try
+		{
+			startListening();
+		}
+		catch (IOException e)
+		{
+			// Oh well
+		}
+
 		return binder;
 	}
 

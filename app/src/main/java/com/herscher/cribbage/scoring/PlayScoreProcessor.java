@@ -20,13 +20,18 @@ public class PlayScoreProcessor
 	private final static int MAX_COUNT = 31;
 
 	private final List<Card> playedCards;
-	private final PlayScorer[] scorers;
+	private final List<PlayScorer> scorers;
 	private int count;
 
 	public PlayScoreProcessor(PlayScorer... scorers)
 	{
-		this.scorers = scorers;
+		this.scorers = new ArrayList<>();
 		playedCards = new ArrayList<>();
+
+		for (PlayScorer ps : scorers)
+		{
+			this.scorers.add(ps);
+		}
 	}
 
 	public ScoreUnit[] playCard(@NonNull Card card) throws RulesViolationException

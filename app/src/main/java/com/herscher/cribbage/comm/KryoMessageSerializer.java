@@ -13,7 +13,10 @@ import com.herscher.cribbage.comm.message.JoinGameAcceptedResponseMessage;
 import com.herscher.cribbage.comm.message.JoinGameRejectedResponseMessage;
 import com.herscher.cribbage.comm.message.JoinGameRequestMessage;
 import com.herscher.cribbage.comm.message.Message;
+import com.herscher.cribbage.scoring.FifteensPlayScorer;
+import com.herscher.cribbage.scoring.PairsPlayScorer;
 import com.herscher.cribbage.scoring.PlayScoreProcessor;
+import com.herscher.cribbage.scoring.RunsPlayScorer;
 import com.herscher.cribbage.scoring.StandardShowdownScoreProcessor;
 
 import org.objenesis.strategy.StdInstantiatorStrategy;
@@ -32,7 +35,15 @@ public class KryoMessageSerializer implements MessageSerializer
 	public KryoMessageSerializer()
 	{
 		kryo = new Kryo();
-		kryo.setInstantiatorStrategy(new StdInstantiatorStrategy());
+
+		// Important to allow classes without default constructors to be created
+		((Kryo.DefaultInstantiatorStrategy) kryo.getInstantiatorStrategy())
+				.setFallbackInstantiatorStrategy(
+						new StdInstantiatorStrategy());
+
+		// Require registration so we crash if an unexpected class is serialized, as this is
+		// preferable to failing deserialization on the other side because the random class ID is
+		// different
 		kryo.setRegistrationRequired(true);
 
 		try
@@ -41,7 +52,8 @@ public class KryoMessageSerializer implements MessageSerializer
 		}
 		catch (ClassNotFoundException e)
 		{
-			e.printStackTrace();
+			throw new IllegalStateException(
+					String.format("kryo register failed (%s)", e.getMessage()));
 		}
 	}
 
@@ -62,6 +74,7 @@ public class KryoMessageSerializer implements MessageSerializer
 		}
 		catch (KryoException e)
 		{
+			e.printStackTrace();
 			throw new IOException(e.getMessage());
 		}
 		finally
@@ -121,14 +134,24 @@ public class KryoMessageSerializer implements MessageSerializer
 		kryo.register(JoinGameRejectedResponseMessage.class, id++);
 		kryo.register(JoinGameRequestMessage.class, id++);
 		kryo.register(CribbageGame.class, id++);
+		kryo.register(CribbageGame.State.class, id++);
 		kryo.register(PlayScoreProcessor.class, id++);
 		kryo.register(StandardShowdownScoreProcessor.class, id++);
 		kryo.register(CardCollection.class, id++);
 		kryo.register(PlayerState.class, id++);
 		kryo.register(ArrayList.class, id++);
-		kryo.register(Class.forName("com.herscher.cribbage.CribbageGame$DiscardStateActionHandler.class"), id++);
-		kryo.register(Class.forName("com.herscher.cribbage.CribbageGame$NewRoundStateActionHandler.class"), id++);
-		kryo.register(Class.forName("com.herscher.cribbage.CribbageGame$PlayStateActionHandler.class"), id++);
+		kryo.register(FifteensPlayScorer.class, id++);
+		kryo.register(PairsPlayScorer.class, id++);
+		kryo.register(RunsPlayScorer.class, id++);
+		kryo.register(Class.forName("com.herscher.cribbage" +
+				".CribbageGame$DiscardStateActionHandler"), id++);
+		kryo.register(
+				Class.forName("com.herscher.cribbage.CribbageGame$NewRoundStateActionHandler"),
+				id++);
+		kryo.register(Class.forName("com.herscher.cribbage.CribbageGame$PlayStateActionHandler"),
+				id++);
+		kryo.register(Class.forName("com.herscher.cribbage" +
+				".CribbageGame$NewGameStateActionHandler"), id++);
 		kryo.register(Card.class, id);
 	}
 }

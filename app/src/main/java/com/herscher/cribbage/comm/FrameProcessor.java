@@ -19,8 +19,8 @@ public class FrameProcessor
 
 	private final static int CRC_LENGTH = 4;
 
-	// start + header type + frame ID + crc + end
-	private final static int FRAME_PROTOCOL_LENGTH = 1 + 1 + 2 + CRC_LENGTH + 1;
+	// frame type + frame ID + crc
+	private final static int FRAME_PROTOCOL_LENGTH = 1 + 2 + CRC_LENGTH;
 	private final static byte ESCAPE_BYTE = 0x7E;
 	private final static byte ESCAPE_XOR = 0x20;
 	private final static byte START_BYTE = 0x7C;
@@ -102,26 +102,28 @@ public class FrameProcessor
 		crc.update(frame.data);
 
 		int crcValue = (int) crc.getValue();
-		int byteCount = FRAME_PROTOCOL_LENGTH + countRequiredBytes(frame, crcValue);
+		int byteCount = countRequiredBytes(frame, crcValue);
 
 		ByteBuffer outBuffer = ByteBuffer.allocate(byteCount);
 		outBuffer.order(ByteOrder.LITTLE_ENDIAN);
 
 		outBuffer.put(START_BYTE);
+
+		// Add CRC
+		for (int i = 0; i < CRC_LENGTH; i++)
+		{
+			encodeByte((byte) ((crcValue >> (8 * i)) & 0xFF), outBuffer);
+		}
+
+		// Add frame type and frame ID
 		encodeByte(frame.frameType, outBuffer);
-		encodeByte((byte)(frame.frameId & 0xFF), outBuffer);
-		encodeByte((byte)((frame.frameId >> 8) & 0xFF), outBuffer);
+		encodeByte((byte) (frame.frameId & 0xFF), outBuffer);
+		encodeByte((byte) ((frame.frameId >> 8) & 0xFF), outBuffer);
 
 		// Add payload
 		for (byte b : frame.data)
 		{
 			encodeByte(b, outBuffer);
-		}
-
-		// Add CRC (must also be escaped)
-		for (int i = 0; i < 4; i++)
-		{
-			encodeByte((byte) ((crcValue >> (8 * i)) & 0xFF), outBuffer);
 		}
 
 		outBuffer.put(END_BYTE);
@@ -196,7 +198,8 @@ public class FrameProcessor
 		switch (b)
 		{
 			case START_BYTE:
-				// Unexpected start byte, which means we must assume it was valid and start a new frame
+				// Unexpected start byte, which means we must assume it was valid and start a new
+				// frame
 				resetDecodeState(ReceiveState.PROCESSING_NORMAL);
 				throw new FrameFormatException("Received start byte when escaped byte expected");
 
@@ -204,8 +207,9 @@ public class FrameProcessor
 			case END_BYTE:
 				// Error; discard all data received
 				resetDecodeState();
-				throw new FrameFormatException(String.format("Received special byte %d when escaped byte expected",
-						b));
+				throw new FrameFormatException(
+						String.format("Received special byte %d when escaped byte expected",
+								b));
 
 			default:
 				// Unescape and add
@@ -220,7 +224,8 @@ public class FrameProcessor
 		switch (b)
 		{
 			case START_BYTE:
-				// Unexpected start byte, which means we must assume it was valid and start a new frame
+				// Unexpected start byte, which means we must assume it was valid and start a new
+				// frame
 				resetDecodeState(ReceiveState.PROCESSING_NORMAL);
 				throw new FrameFormatException("Received start byte when processing normally");
 
@@ -231,7 +236,6 @@ public class FrameProcessor
 
 			case END_BYTE:
 				// End of the frame
-				receiveState = ReceiveState.LOOKING_FOR_START;
 				try
 				{
 					return getFrameFromBuffer();
@@ -239,6 +243,7 @@ public class FrameProcessor
 				finally
 				{
 					receiveBuffer.position(0);
+					receiveState = ReceiveState.LOOKING_FOR_START;
 				}
 
 			default:
@@ -250,36 +255,35 @@ public class FrameProcessor
 
 	private Frame getFrameFromBuffer() throws FrameFormatException
 	{
-		int crcStartIndex = receiveBuffer.position() - CRC_LENGTH;
-		int receiveBufferPosition = receiveBuffer.position();
+		int actualBufferLength = receiveBuffer.position();
 
-		if (receiveBufferPosition < FRAME_PROTOCOL_LENGTH)
+		if (actualBufferLength < FRAME_PROTOCOL_LENGTH)
 		{
 			// Not enough bytes
 			throw new FrameFormatException(String.format("Not enough bytes to form frame (got %d)",
-					receiveBufferPosition));
+					actualBufferLength));
 		}
 
+		// Check CRC
 		CRC32 crc = new CRC32();
-		int receivedCrc = receiveBuffer.getInt(crcStartIndex);
-
-		crc.update(receiveBuffer.array(), 0, crcStartIndex);
+		receiveBuffer.position(0);
+		int receivedCrc = receiveBuffer.getInt();
+		crc.update(receiveBuffer.array(), CRC_LENGTH, actualBufferLength - CRC_LENGTH);
 		int calculatedCrc = (int) crc.getValue();
 
 		if (calculatedCrc != receivedCrc)
 		{
-			throw new FrameFormatException(String.format("CRC failure; got 0x%04X calculated 0x%04X", receivedCrc,
-					calculatedCrc));
+			throw new FrameFormatException(
+					String.format("CRC failure; got 0x%04X calculated 0x%04X", receivedCrc,
+							calculatedCrc));
 		}
-		else
-		{
-			receiveBuffer.position(0);
-			byte frameType = receiveBuffer.get();
-			short frameId = receiveBuffer.getShort();
-			byte[] frameBytes = new byte[receiveBuffer.remaining()];
-			System.arraycopy(receiveBuffer.array(), 0, frameBytes, 0, frameBytes.length);
-			return new Frame(frameType, frameId, frameBytes);
-		}
+
+		// CRC passed validation
+		byte frameType = receiveBuffer.get();
+		short frameId = receiveBuffer.getShort();
+		byte[] frameBytes = new byte[actualBufferLength - receiveBuffer.position()];
+		System.arraycopy(receiveBuffer.array(), receiveBuffer.position(), frameBytes, 0, frameBytes.length);
+		return new Frame(frameType, frameId, frameBytes);
 	}
 
 	private boolean mustEscapeByte(byte b)
@@ -311,9 +315,10 @@ public class FrameProcessor
 
 	private int countRequiredBytes(Frame frame, int crc)
 	{
-		int byteCount = FRAME_PROTOCOL_LENGTH + frame.data.length;
+		// +1 for start, +1 for end
+		int byteCount = 1 + FRAME_PROTOCOL_LENGTH + frame.data.length + 1;
 
-		// Header type
+		// Frame type
 		if (mustEscapeByte(frame.frameType))
 		{
 			byteCount++;
@@ -328,19 +333,19 @@ public class FrameProcessor
 			}
 		}
 
-		// Frame data
-		for (byte b : frame.data)
+		// CRC
+		for (int i = 0; i < CRC_LENGTH; i++)
 		{
-			if (mustEscapeByte(b))
+			if (mustEscapeByte((byte) ((crc >> (8 * i)) & 0xFF)))
 			{
 				byteCount++;
 			}
 		}
 
-		// CRC
-		for (int i = 0; i < 4; i++)
+		// Frame data
+		for (byte b : frame.data)
 		{
-			if (mustEscapeByte((byte) ((crc >> (8 * i)) & 0xFF)))
+			if (mustEscapeByte(b))
 			{
 				byteCount++;
 			}

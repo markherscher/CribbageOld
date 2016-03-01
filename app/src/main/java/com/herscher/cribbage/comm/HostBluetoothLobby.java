@@ -147,36 +147,41 @@ public class HostBluetoothLobby
 			{
 				BluetoothSocket socket = acceptBluetoothSocket();
 				final RemoteMessageConnection newConnection = createRemoteMessageConnection(socket);
-				boolean shouldAcceptNewConnection = false;
+				boolean shouldAcceptNewConnection;
 
 				synchronized (connectedPlayerLock)
 				{
 					shouldAcceptNewConnection = connectedPlayer == null;
 				}
 
-				if (shouldAcceptNewConnection)
+				if (newConnection != null)
 				{
-					Player newPlayer = null;
-					try
+					if (shouldAcceptNewConnection)
 					{
-						newPlayer = lobbyAccepter.acceptConnection(newConnection);
-					}
-					catch (IOException e)
-					{
-						Log.e(TAG, String.format("Error in lobbyAccepter: %s", e.getMessage()));
-						handleListeningError(e);
-					}
+						Player newPlayer = null;
+						try
+						{
+							newPlayer = lobbyAccepter.acceptConnection(newConnection);
+						}
+						catch (IOException e)
+						{
+							Log.e(TAG, String.format("Error in lobbyAccepter: %s", e.getMessage()));
 
-					if (newPlayer != null)
-					{
-						handlePlayerJoined(newPlayer, newConnection);
+							handleListeningError(e);
+						}
+
+						if (newPlayer != null)
+						{
+							handlePlayerJoined(newPlayer, newConnection);
+						}
 					}
-				}
-				else
-				{
-					// Lobby is full
-					newConnection.send(new JoinGameRejectedResponseMessage("Lobby is full"), null);
-					newConnection.setCloseWhenEmpty(true);
+					else
+					{
+						// Lobby is full
+						newConnection.send(new JoinGameRejectedResponseMessage("Lobby is full"),
+								null);
+						newConnection.setCloseWhenEmpty(true);
+					}
 				}
 			}
 		}
@@ -217,7 +222,7 @@ public class HostBluetoothLobby
 				return null;
 			}
 
-			return new RemoteMessageConnection(new FrameRemoteTransport(remoteLink, new Handler()), new KryoMessageSerializer());
+			return new RemoteMessageConnection(new FrameRemoteTransport(remoteLink, handler), new KryoMessageSerializer());
 		}
 
 		public void stop()

@@ -22,10 +22,6 @@ import java.io.IOException;
 public class HostLobbyActivity extends Activity
 {
 	private static final String TAG = "HostLobbyActivity";
-
-	// Look at what needs to go into the fragment. Remember I will lose everything on create,
-	// namely connected player
-
 	private BluetoothHostLobbyService bluetoothService;
 	private LobbyFragment lobbyFragment;
 
@@ -51,7 +47,7 @@ public class HostLobbyActivity extends Activity
 		lobbyFragment.setListener(null);
 	}
 
-	private LobbyFragment.Listener lobbyFragmentListener = new LobbyFragment.Listener()
+	private final LobbyFragment.Listener lobbyFragmentListener = new LobbyFragment.Listener()
 	{
 		@Override
 		public void onStartClicked()

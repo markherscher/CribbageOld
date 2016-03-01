@@ -1,6 +1,5 @@
 package com.herscher.cribbage.comm;
 
-import android.os.Handler;
 import android.util.Log;
 
 import com.herscher.cribbage.Player;
@@ -25,9 +24,9 @@ public class LobbyJoiner
 	private Lobby lobby;
 	private boolean isRunning;
 
-	public LobbyJoiner(MessageConnection messageConnection, Player player, Handler handler)
+	public LobbyJoiner(Player player)
 	{
-		if (messageConnection == null || player == null || handler == null)
+		if (player == null)
 		{
 			throw new IllegalArgumentException();
 		}

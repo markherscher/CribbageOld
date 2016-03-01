@@ -53,7 +53,8 @@ public class BluetoothHostLobbyService extends Service
 	public void onCreate()
 	{
 		handler = new Handler();
-		hostBluetoothLobby = new HostBluetoothLobby(LocalStuff.localPlayer, handler, lobbyListener);
+		hostBluetoothLobby = new HostBluetoothLobby(LocalStuff.localPlayer, handler,
+				lobbyListener);
 	}
 
 	@Override
@@ -115,17 +116,9 @@ public class BluetoothHostLobbyService extends Service
 	{
 		if (serverSocket == null)
 		{
-			try
-			{
-				serverSocket = openServerSocket();
-			}
-			catch (IOException e)
-			{
-				Log.e(TAG, String.format("Error creating RFCOMM listening socket: %s", e.getMessage()));
-				throw e;
-			}
+			BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
 
-			if (serverSocket == null)
+			if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled())
 			{
 				for (Listener l : listeners)
 				{
@@ -133,6 +126,19 @@ public class BluetoothHostLobbyService extends Service
 				}
 				return false;
 			}
+
+			try
+			{
+				serverSocket = openServerSocket(bluetoothAdapter);
+			}
+			catch (IOException e)
+			{
+				Log.e(TAG, String.format("Error creating RFCOMM listening socket: %s",
+						e.getMessage()));
+				throw e;
+			}
+
+			makeDiscoverable(bluetoothAdapter);
 		}
 
 		return hostBluetoothLobby.startHosting(serverSocket, createGame());
@@ -148,16 +154,22 @@ public class BluetoothHostLobbyService extends Service
 		return hostBluetoothLobby.getConnectedPlayer();
 	}
 
-	private BluetoothServerSocket openServerSocket() throws IOException
+	private BluetoothServerSocket openServerSocket(
+			BluetoothAdapter bluetoothAdapter) throws IOException
 	{
-		BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+		return bluetoothAdapter.listenUsingInsecureRfcommWithServiceRecord("Cribbage Game 1",
+				BluetoothConstants.RFCOMM_UUID);
+	}
 
-		if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled())
+	private void makeDiscoverable(BluetoothAdapter bluetoothAdapter)
+	{
+		if (bluetoothAdapter.getScanMode() !=
+				BluetoothAdapter.SCAN_MODE_CONNECTABLE_DISCOVERABLE)
 		{
-			return null;
+			Intent discoverableIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE);
+			discoverableIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+			startActivity(discoverableIntent);
 		}
-
-		return bluetoothAdapter.listenUsingRfcommWithServiceRecord("Cribbage Game 1", BluetoothConstants.RFCOMM_UUID);
 	}
 
 	private CribbageGame createGame()

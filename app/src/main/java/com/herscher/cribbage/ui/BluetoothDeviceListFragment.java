@@ -6,11 +6,13 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
 
 import com.herscher.cribbage.R;
 
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -19,13 +21,20 @@ import java.util.List;
  */
 public class BluetoothDeviceListFragment extends Fragment
 {
+	public interface Listener
+	{
+		void onDeviceSelected(BluetoothDevice device);
+	}
+
 	private final List<BluetoothDeviceWrapper> deviceList;
 	private ListView gameListView;
 	private ArrayAdapter<BluetoothDeviceWrapper> deviceListAdapter;
+	private WeakReference<Listener> listener;
 
 	public BluetoothDeviceListFragment()
 	{
 		deviceList = new ArrayList<>();
+		listener = new WeakReference<>(null);
 		setRetainInstance(true);
 	}
 
@@ -44,6 +53,7 @@ public class BluetoothDeviceListFragment extends Fragment
 				deviceList);
 
 		gameListView.setAdapter(deviceListAdapter);
+		gameListView.setOnItemClickListener(itemClickListener);
 	}
 
 	@Override
@@ -51,6 +61,11 @@ public class BluetoothDeviceListFragment extends Fragment
 	{
 		super.onDetach();
 		gameListView = null;
+	}
+
+	public void setListener(Listener listener)
+	{
+		this.listener = new WeakReference<>(listener);
 	}
 
 	public void addBluetoothDevice(BluetoothDevice bluetoothDevice)
@@ -81,4 +96,17 @@ public class BluetoothDeviceListFragment extends Fragment
 					bluetoothDevice.getAddress());
 		}
 	}
+
+	private ListView.OnItemClickListener itemClickListener = new AdapterView.OnItemClickListener()
+	{
+		@Override
+		public void onItemClick(AdapterView<?> parent, View view, int position, long id)
+		{
+			Listener l = listener.get();
+			if (l != null && position < deviceList.size())
+			{
+				l.onDeviceSelected(deviceList.get(position).bluetoothDevice);
+			}
+		}
+	};
 }

@@ -153,7 +153,7 @@ public class RemoteMessageConnection implements MessageConnection
 				}
 				catch (IOException e)
 				{
-					Log.w(TAG, String.format("Failed to serialize event %s: %s", next.message.toString(), e.getMessage()));
+					Log.w(TAG, String.format("Failed to serialize message %s: %s", next.message.toString(), e.getMessage()));
 					trySendNext();
 					return;
 				}
@@ -221,7 +221,7 @@ public class RemoteMessageConnection implements MessageConnection
 				}
 				catch (IOException e)
 				{
-					Log.w(TAG, String.format("Failed to deserialize event: %s", e.getMessage()));
+					Log.w(TAG, String.format("Failed to deserialize message: %s", e.getMessage()));
 					return;
 				}
 

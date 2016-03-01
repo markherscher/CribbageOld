@@ -5,6 +5,7 @@ import android.os.Handler;
 import android.util.Log;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -169,7 +170,7 @@ public class FrameRemoteTransport implements RemoteTransport
 			@Override
 			public void run()
 			{
-				if (frame.getFrameId() == currentWrite.frame.getFrameId())
+				if (currentWrite != null && frame.getFrameId() == currentWrite.frame.getFrameId())
 				{
 					// Received ACK
 					handleWriteComplete(null);
@@ -184,6 +185,8 @@ public class FrameRemoteTransport implements RemoteTransport
 		// retried the sender will not be informed their second try was also received, and
 		// consider it a failure.
 		writeAckForFrame(frame);
+
+		System.out.println("FUCKING RECEIVED " + Arrays.toString(frame.getData()));
 
 		handler.post(new Runnable()
 		{
@@ -256,6 +259,7 @@ public class FrameRemoteTransport implements RemoteTransport
 			// Reminder: runs on AsyncTask worker thread
 			try
 			{
+				System.out.println("FUCKING SENT: " + Arrays.toString(frame.getData()));
 				writeToLink(frameBytes);
 			}
 			catch (final IOException e)

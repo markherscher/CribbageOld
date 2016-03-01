@@ -227,7 +227,7 @@ public class CribbageGame
 		}
 	}
 
-	private abstract class StateActionHandler
+	private static abstract class StateActionHandler
 	{
 		private final State state;
 
@@ -284,7 +284,7 @@ public class CribbageGame
 		}
 	}
 
-	private class NewRoundStateActionHandler extends StateActionHandler
+	private static class NewRoundStateActionHandler extends StateActionHandler
 	{
 		public NewRoundStateActionHandler()
 		{

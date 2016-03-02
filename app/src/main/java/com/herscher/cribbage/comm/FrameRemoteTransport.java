@@ -14,6 +14,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  */
 public class FrameRemoteTransport implements RemoteTransport
 {
+	private final static String TAG = "FrameRemoteTransport";
 	private final static byte DATA_FRAME_TYPE = (byte) 0xAA;
 	private final static byte ACK_FRAME_TYPE = (byte) 0xBB;
 	private final static int MAX_WRITE_ATTEMPTS = 3;
@@ -149,15 +150,17 @@ public class FrameRemoteTransport implements RemoteTransport
 		switch (frame.getFrameType())
 		{
 			case ACK_FRAME_TYPE:
+				Log.v(TAG, String.format("Received ack frame for id %d", frame.getFrameId()));
 				handleAckFrameReceived(frame);
 				break;
 
 			case DATA_FRAME_TYPE:
+				Log.v(TAG, String.format("Received data frame with id %d", frame.getFrameId()));
 				handleDataFrameReceived(frame);
 				break;
 
 			default:
-				handleDebugLog(String.format("Frame of unknown type (%d) received",
+				Log.w(TAG, String.format("Frame of unknown type (%d) received",
 						frame.getFrameType()));
 				break;
 		}
@@ -209,8 +212,8 @@ public class FrameRemoteTransport implements RemoteTransport
 
 	private void writeAckForFrame(FrameProcessor.Frame frame)
 	{
-		final FrameProcessor.Frame ackFrame = new FrameProcessor.Frame(ACK_FRAME_TYPE, frame.getFrameId(),
-				new byte[0]);
+		final FrameProcessor.Frame ackFrame = new FrameProcessor.Frame(ACK_FRAME_TYPE,
+				frame.getFrameId(), new byte[0]);
 
 		AsyncTask.execute(new Runnable()
 		{
@@ -219,21 +222,18 @@ public class FrameRemoteTransport implements RemoteTransport
 			{
 				try
 				{
+					Log.v(TAG, String.format("Writing ack frame for id %d", ackFrame.getFrameId
+							()));
 					writeToLink(frameProcessor.encode(ackFrame));
 				}
 				catch (IOException e)
 				{
 					// Don't call the listener for write completed, as that's only for data writes
 					// originating from here
-					handleDebugLog(String.format("IOException writing ACK (%s)", e.getMessage()));
+					Log.e(TAG, String.format("IOException writing ACK (%s)", e.getMessage()));
 				}
 			}
 		});
-	}
-
-	private void handleDebugLog(String msg)
-	{
-		Log.w("FrameRemoteTransport", msg);
 	}
 
 	private synchronized void writeToLink(byte[] bytes) throws IOException
@@ -259,7 +259,7 @@ public class FrameRemoteTransport implements RemoteTransport
 			// Reminder: runs on AsyncTask worker thread
 			try
 			{
-				System.out.println("FUCKING SENT: " + Arrays.toString(frame.getData()));
+				Log.v(TAG, String.format("Writing data frame with id %d", frame.getFrameId()));
 				writeToLink(frameBytes);
 			}
 			catch (final IOException e)
@@ -326,7 +326,7 @@ public class FrameRemoteTransport implements RemoteTransport
 				}
 				catch (FrameFormatException e)
 				{
-					handleDebugLog(String.format("Received invalid frame (%s)", e.getMessage()));
+					Log.e(TAG, String.format("Received invalid frame (%s)", e.getMessage()));
 				}
 
 				if (frame != null)
@@ -350,11 +350,15 @@ public class FrameRemoteTransport implements RemoteTransport
 			if (currentWrite.writeCount >= MAX_WRITE_ATTEMPTS)
 			{
 				// Give up trying to send
-				handleWriteComplete(new IOException("bytes not acknowledged"));
+				Log.e(TAG, String.format("No ack received for data frame id %d, giving up",
+						currentWrite.frame.getFrameId()));
+				handleWriteComplete(new IOException("frame not acknowledged"));
 			}
 			else
 			{
 				// Try again
+				Log.w(TAG, String.format("No ack received for data frame id %d, trying again",
+						currentWrite.frame.getFrameId()));
 				currentWrite.performWrite();
 			}
 		}

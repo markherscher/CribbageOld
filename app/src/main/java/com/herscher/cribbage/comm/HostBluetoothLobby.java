@@ -104,13 +104,7 @@ public class HostBluetoothLobby
 		{
 			synchronized (connectedPlayerLock)
 			{
-				if (connectedPlayer != null)
-				{
-					connectedPlayer.messageConnection.send(new PlayerQuitMessage(hostPlayer), null);
-					connectedPlayer.messageConnection.setCloseWhenEmpty(true);
-					connectedPlayer.messageConnection.removeListener(messageConnectionListener);
-					connectedPlayer = null;
-				}
+				clearConnectedPlayer(true);
 			}
 		}
 
@@ -125,6 +119,28 @@ public class HostBluetoothLobby
 	public PlayerConnection getConnectedPlayer()
 	{
 		return connectedPlayer;
+	}
+
+	private void clearConnectedPlayer(boolean sendQuit)
+	{
+		if (connectedPlayer != null)
+		{
+			PlayerConnection quitter = connectedPlayer;
+			connectedPlayer.messageConnection.removeListener(messageConnectionListener);
+
+			if (sendQuit)
+			{
+				connectedPlayer.messageConnection.send(new PlayerQuitMessage(hostPlayer), null);
+				connectedPlayer.messageConnection.setCloseWhenEmpty(true);
+			}
+			else
+			{
+				connectedPlayer.messageConnection.close();
+			}
+
+			connectedPlayer = null;
+			listener.onPlayerQuit(quitter);
+		}
 	}
 
 	private class ListenRunnable implements Runnable
@@ -146,7 +162,8 @@ public class HostBluetoothLobby
 			while (isOpen)
 			{
 				BluetoothSocket socket = acceptBluetoothSocket();
-				final RemoteMessageConnection newConnection = createRemoteMessageConnection(socket);
+				final RemoteMessageConnection newConnection = createRemoteMessageConnection
+						(socket);
 				boolean shouldAcceptNewConnection;
 
 				synchronized (connectedPlayerLock)
@@ -165,7 +182,8 @@ public class HostBluetoothLobby
 						}
 						catch (IOException e)
 						{
-							Log.e(TAG, String.format("Error in lobbyAccepter: %s", e.getMessage()));
+							Log.e(TAG, String.format("Error in lobbyAccepter: %s", e.getMessage
+									()));
 
 							handleListeningError(e);
 						}
@@ -217,12 +235,14 @@ public class HostBluetoothLobby
 			}
 			catch (IOException e)
 			{
-				Log.e(TAG, String.format("Error creating BluetoothRemoteLink: %s", e.getMessage()));
+				Log.e(TAG, String.format("Error creating BluetoothRemoteLink: %s", e.getMessage
+						()));
 				handleListeningError(e);
 				return null;
 			}
 
-			return new RemoteMessageConnection(new FrameRemoteTransport(remoteLink, handler), new KryoMessageSerializer());
+			return new RemoteMessageConnection(new FrameRemoteTransport(remoteLink, handler),
+					new KryoMessageSerializer());
 		}
 
 		public void stop()
@@ -265,7 +285,8 @@ public class HostBluetoothLobby
 		}
 	}
 
-	private RemoteMessageConnection.Listener messageConnectionListener = new MessageConnection.Listener()
+	private RemoteMessageConnection.Listener messageConnectionListener = new MessageConnection
+			.Listener()
 	{
 		@Override
 		public void onReceived(Message message)
@@ -279,11 +300,8 @@ public class HostBluetoothLobby
 		@Override
 		public void onReceiveError(final IOException error)
 		{
-			if (stopHosting())
-			{
-				Log.e(TAG, String.format("Error recieved: %s", error.getMessage()));
-				listener.onHostingStopped(error);
-			}
+			Log.e(TAG, String.format("Error received: %s", error.getMessage()));
+			handlePlayerQuit();
 		}
 
 		@Override
@@ -299,13 +317,10 @@ public class HostBluetoothLobby
 			{
 				if (connectedPlayer != null)
 				{
-					Log.i(TAG, String.format("Player %s has quit", connectedPlayer.player.toString()));
-
-					PlayerConnection quitter = connectedPlayer;
-					connectedPlayer.messageConnection.removeListener(this);
-					connectedPlayer.messageConnection.close();
-					connectedPlayer = null;
-					HostBluetoothLobby.this.listener.onPlayerQuit(quitter);
+					Log.i(TAG,
+							String.format("Player %s has quit", connectedPlayer.player.toString
+									()));
+					clearConnectedPlayer(false);
 				}
 			}
 		}

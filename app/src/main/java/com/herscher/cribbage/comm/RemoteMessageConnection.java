@@ -15,7 +15,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  */
 public class RemoteMessageConnection implements MessageConnection
 {
-	private final static String TAG = "RemoteGameEventConn";
+	private final static String TAG = "RemoteMessageConnection";
 
 	private final RemoteTransport transport;
 	private final MessageSerializer messageSerializer;
@@ -201,9 +201,14 @@ public class RemoteMessageConnection implements MessageConnection
 					trySendNext();
 				}
 
-				if (sentPair != null && sentPair.callback != null)
+				if (sentPair != null)
 				{
-					sentPair.callback.onSendComplete(sentPair.message, error);
+					Log.d(TAG, String.format("Sent message %s", sentPair.message));
+
+					if (sentPair.callback != null)
+					{
+						sentPair.callback.onSendComplete(sentPair.message, error);
+					}
 				}
 			}
 		}
@@ -213,11 +218,11 @@ public class RemoteMessageConnection implements MessageConnection
 		{
 			if (isOpen)
 			{
-				Message receivedEvent;
+				Message receivedMessage;
 
 				try
 				{
-					receivedEvent = messageSerializer.deserialize(buffer);
+					receivedMessage = messageSerializer.deserialize(buffer);
 				}
 				catch (IOException e)
 				{
@@ -225,9 +230,11 @@ public class RemoteMessageConnection implements MessageConnection
 					return;
 				}
 
+				Log.d(TAG, String.format("Received message %s", receivedMessage.toString()));
+
 				for (Listener l : listeners)
 				{
-					l.onReceived(receivedEvent);
+					l.onReceived(receivedMessage);
 				}
 			}
 		}

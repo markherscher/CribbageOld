@@ -13,6 +13,7 @@ import com.herscher.cribbage.comm.message.JoinGameAcceptedResponseMessage;
 import com.herscher.cribbage.comm.message.JoinGameRejectedResponseMessage;
 import com.herscher.cribbage.comm.message.JoinGameRequestMessage;
 import com.herscher.cribbage.comm.message.Message;
+import com.herscher.cribbage.comm.message.PlayerQuitMessage;
 import com.herscher.cribbage.scoring.FifteensPlayScorer;
 import com.herscher.cribbage.scoring.PairsPlayScorer;
 import com.herscher.cribbage.scoring.PlayScoreProcessor;
@@ -132,6 +133,7 @@ public class KryoMessageSerializer implements MessageSerializer
 		kryo.register(Lobby.class, id++);
 		kryo.register(JoinGameAcceptedResponseMessage.class, id++);
 		kryo.register(JoinGameRejectedResponseMessage.class, id++);
+		kryo.register(PlayerQuitMessage.class, id++);
 		kryo.register(JoinGameRequestMessage.class, id++);
 		kryo.register(CribbageGame.class, id++);
 		kryo.register(CribbageGame.State.class, id++);

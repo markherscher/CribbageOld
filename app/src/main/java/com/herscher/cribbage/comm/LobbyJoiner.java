@@ -15,6 +15,7 @@ import java.io.IOException;
  */
 public class LobbyJoiner
 {
+	private final static int JOIN_DELAY = 500;
 	private final static int TOTAL_TIMEOUT = 5000;
 	private final static String TAG = "LobbyJoiner";
 
@@ -53,6 +54,16 @@ public class LobbyJoiner
 			exception = null;
 			lobby = null;
 			messageConnection.addListener(connectionListener);
+
+			// Give the other side time to get ready
+			try
+			{
+				Thread.sleep(JOIN_DELAY);
+			}
+			catch (InterruptedException e)
+			{
+				// Oh well
+			}
 
 			messageConnection.send(new JoinGameRequestMessage(0, player), new JoinRequestCallback());
 

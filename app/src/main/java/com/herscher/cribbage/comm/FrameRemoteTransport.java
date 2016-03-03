@@ -5,7 +5,6 @@ import android.os.Handler;
 import android.util.Log;
 
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -150,12 +149,10 @@ public class FrameRemoteTransport implements RemoteTransport
 		switch (frame.getFrameType())
 		{
 			case ACK_FRAME_TYPE:
-				Log.v(TAG, String.format("Received ack frame for id %d", frame.getFrameId()));
 				handleAckFrameReceived(frame);
 				break;
 
 			case DATA_FRAME_TYPE:
-				Log.v(TAG, String.format("Received data frame with id %d", frame.getFrameId()));
 				handleDataFrameReceived(frame);
 				break;
 
@@ -168,6 +165,8 @@ public class FrameRemoteTransport implements RemoteTransport
 
 	private void handleAckFrameReceived(final FrameProcessor.Frame frame)
 	{
+		Log.v(TAG, String.format("Received ack frame for id %d", frame.getFrameId()));
+
 		handler.post(new Runnable()
 		{
 			@Override
@@ -189,8 +188,6 @@ public class FrameRemoteTransport implements RemoteTransport
 		// consider it a failure.
 		writeAckForFrame(frame);
 
-		System.out.println("FUCKING RECEIVED " + Arrays.toString(frame.getData()));
-
 		handler.post(new Runnable()
 		{
 			@Override
@@ -200,11 +197,18 @@ public class FrameRemoteTransport implements RemoteTransport
 				int receivedFrameId = (int) (frame.getFrameId()) & 0xFFFF;
 				if (receivedFrameId > lastReceivedFrameId)
 				{
+					Log.v(TAG, String.format("Received data frame with id %d", receivedFrameId));
+
 					lastReceivedFrameId = receivedFrameId;
 					for (Listener l : listeners)
 					{
 						l.onReceived(frame.getData());
 					}
+				}
+				else
+				{
+					Log.w(TAG, String.format("Ignored received data frame with ID %d",
+							receivedFrameId));
 				}
 			}
 		});

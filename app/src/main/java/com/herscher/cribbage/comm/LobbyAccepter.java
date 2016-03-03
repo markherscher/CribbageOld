@@ -111,7 +111,6 @@ public class LobbyAccepter
 			{
 				if (message instanceof JoinGameRequestMessage)
 				{
-
 					if (!isRunning)
 					{
 						return;

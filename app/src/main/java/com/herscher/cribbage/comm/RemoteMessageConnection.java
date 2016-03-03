@@ -67,6 +67,7 @@ public class RemoteMessageConnection implements MessageConnection
 		{
 			synchronized (outgoingQueue)
 			{
+				Log.d(TAG, String.format("Queuing message %s", message.toString()));
 				outgoingQueue.add(new MessageCallbackPair(message, callback));
 				trySendNext();
 			}
@@ -98,7 +99,8 @@ public class RemoteMessageConnection implements MessageConnection
 				{
 					if (pair.callback != null)
 					{
-						pair.callback.onSendComplete(pair.message, new IOException("connection is closed"));
+						pair.callback.onSendComplete(pair.message,
+								new IOException("connection is closed"));
 					}
 				}
 			}
@@ -153,12 +155,15 @@ public class RemoteMessageConnection implements MessageConnection
 				}
 				catch (IOException e)
 				{
-					Log.w(TAG, String.format("Failed to serialize message %s: %s", next.message.toString(), e.getMessage()));
+					Log.w(TAG, String.format("Failed to serialize message %s: %s",
+							next.message.toString(), e.getMessage()));
 					trySendNext();
 					return;
 				}
 
 				messagePairBeingSent = next;
+				Log.d(TAG, String.format("Starting transport-level write of message %s",
+						next.message.toString()));
 				transport.startWrite(rawBytes);
 			}
 			else
@@ -185,7 +190,7 @@ public class RemoteMessageConnection implements MessageConnection
 		}
 	}
 
-	private RemoteTransport.Listener transportListener = new RemoteTransport.Listener()
+	private final RemoteTransport.Listener transportListener = new RemoteTransport.Listener()
 	{
 		@Override
 		public void onWriteComplete(IOException error)
@@ -203,7 +208,7 @@ public class RemoteMessageConnection implements MessageConnection
 
 				if (sentPair != null)
 				{
-					Log.d(TAG, String.format("Sent message %s", sentPair.message));
+					Log.d(TAG, String.format("Send complete for message %s", sentPair.message));
 
 					if (sentPair.callback != null)
 					{

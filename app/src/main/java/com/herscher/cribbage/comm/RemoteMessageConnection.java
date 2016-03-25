@@ -63,7 +63,7 @@ public class RemoteMessageConnection implements MessageConnection
 			throw new IllegalArgumentException();
 		}
 
-		if (isOpen)
+		if (isOpen && !closeWhenEmpty)
 		{
 			synchronized (outgoingQueue)
 			{
@@ -86,6 +86,21 @@ public class RemoteMessageConnection implements MessageConnection
 
 	@Override
 	public synchronized void close()
+	{
+		if (isOpen && !closeWhenEmpty)
+		{
+			closeWhenEmpty = true;
+
+			// Kick the queue to check it
+			synchronized (outgoingQueue)
+			{
+				trySendNext();
+			}
+		}
+	}
+
+	@Override
+	public synchronized void closeImmediately()
 	{
 		if (isOpen)
 		{
@@ -112,23 +127,6 @@ public class RemoteMessageConnection implements MessageConnection
 
 			outgoingQueue.clear();
 			listeners.clear();
-		}
-	}
-
-	public synchronized void setCloseWhenEmpty(boolean shouldClose)
-	{
-		if (isOpen)
-		{
-			closeWhenEmpty = shouldClose;
-
-			if (closeWhenEmpty)
-			{
-				// Kick the queue to check it
-				synchronized (outgoingQueue)
-				{
-					trySendNext();
-				}
-			}
 		}
 	}
 
@@ -174,7 +172,7 @@ public class RemoteMessageConnection implements MessageConnection
 
 		if (isEmpty && closeWhenEmpty)
 		{
-			close();
+			closeImmediately();
 		}
 	}
 
@@ -259,7 +257,7 @@ public class RemoteMessageConnection implements MessageConnection
 		@Override
 		public void onClosed()
 		{
-			close();
+			closeImmediately();
 		}
 	};
 }

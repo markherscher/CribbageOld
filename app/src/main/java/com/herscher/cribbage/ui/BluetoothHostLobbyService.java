@@ -151,7 +151,7 @@ public class BluetoothHostLobbyService extends Service
 
 	public HostBluetoothLobby.PlayerConnection getConnectedPlayer()
 	{
-		return hostBluetoothLobby.getConnectedPlayer();
+		return hostBluetoothLobby.getConnectedLobby();
 	}
 
 	private BluetoothServerSocket openServerSocket(

@@ -1,15 +1,11 @@
 package com.herscher.cribbage.comm;
 
 import android.bluetooth.BluetoothServerSocket;
-import android.bluetooth.BluetoothSocket;
 import android.os.Handler;
 import android.util.Log;
 
 import com.herscher.cribbage.CribbageGame;
 import com.herscher.cribbage.Player;
-import com.herscher.cribbage.comm.message.JoinGameRejectedResponseMessage;
-import com.herscher.cribbage.comm.message.Message;
-import com.herscher.cribbage.comm.message.PlayerQuitMessage;
 
 import java.io.IOException;
 
@@ -19,11 +15,12 @@ import java.io.IOException;
  */
 public class HostBluetoothLobby
 {
+	NOTHING IS HAPPENING WITH THIS LISTENER YET
 	public interface Listener
 	{
-		void onPlayerJoined(PlayerConnection playerConnection);
+		void onPlayerJoined(LobbyBridge lobbyBridge);
 
-		void onPlayerQuit(PlayerConnection playerConnection);
+		void onPlayerQuit(LobbyBridge lobbyBridge);
 
 		void onHostingStopped(IOException cause);
 	}
@@ -32,32 +29,10 @@ public class HostBluetoothLobby
 	private final Handler handler;
 	private final Listener listener;
 	private final Player hostPlayer;
-	private final Object connectedPlayerLock = new Object();
+	private final Object connectedLobbyLock = new Object();
 	private final Object isHostingLock = new Object();
 	private ListenRunnable listenRunnable;
-	private PlayerConnection connectedPlayer;
-
-	public static class PlayerConnection
-	{
-		private final Player player;
-		private final RemoteMessageConnection messageConnection;
-
-		public PlayerConnection(Player player, RemoteMessageConnection messageConnection)
-		{
-			this.player = player;
-			this.messageConnection = messageConnection;
-		}
-
-		public Player getPlayer()
-		{
-			return player;
-		}
-
-		public RemoteMessageConnection getMessageConnection()
-		{
-			return messageConnection;
-		}
-	}
+	private LobbyBridge connectedLobby;
 
 	public HostBluetoothLobby(Player hostPlayer, Handler handler, Listener listener)
 	{
@@ -102,9 +77,9 @@ public class HostBluetoothLobby
 
 		if (wasStopped)
 		{
-			synchronized (connectedPlayerLock)
+			synchronized (connectedLobbyLock)
 			{
-				clearConnectedPlayer(true);
+				quitAndNotifyOthers();
 			}
 		}
 
@@ -116,43 +91,33 @@ public class HostBluetoothLobby
 		return listenRunnable != null;
 	}
 
-	public PlayerConnection getConnectedPlayer()
+	public LobbyBridge getConnectedLobby()
 	{
-		return connectedPlayer;
+		return connectedLobby;
 	}
 
-	private void clearConnectedPlayer(boolean sendQuit)
+	private void quitAndNotifyOthers()
 	{
-		if (connectedPlayer != null)
+		if (connectedLobby != null)
 		{
-			PlayerConnection quitter = connectedPlayer;
-			connectedPlayer.messageConnection.removeListener(messageConnectionListener);
-
-			if (sendQuit)
-			{
-				connectedPlayer.messageConnection.send(new PlayerQuitMessage(hostPlayer), null);
-				connectedPlayer.messageConnection.setCloseWhenEmpty(true);
-			}
-			else
-			{
-				connectedPlayer.messageConnection.close();
-			}
-
-			connectedPlayer = null;
-			listener.onPlayerQuit(quitter);
+			// TODO: REMOVE ANY LISTENERS
+			connectedLobby.sendPlayerQuit(hostPlayer);
+			connectedLobby = null;
 		}
 	}
 
 	private class ListenRunnable implements Runnable
 	{
 		private final BluetoothServerSocket serverSocket;
-		private final LobbyAccepter lobbyAccepter;
+		private final BluetoothConnectionAccepter accepter;
+		private final CribbageGame game;
 		private boolean isOpen;
 
 		public ListenRunnable(BluetoothServerSocket serverSocket, CribbageGame game)
 		{
 			this.serverSocket = serverSocket;
-			lobbyAccepter = new LobbyAccepter(hostPlayer, game);
+			this.game = game;
+			accepter = new BluetoothConnectionAccepter(handler);
 			isOpen = true;
 		}
 
@@ -161,88 +126,25 @@ public class HostBluetoothLobby
 		{
 			while (isOpen)
 			{
-				BluetoothSocket socket = acceptBluetoothSocket();
-				final RemoteMessageConnection newConnection = createRemoteMessageConnection
-						(socket);
-				boolean shouldAcceptNewConnection;
+				RemoteMessageConnection newConnection = null;
 
-				synchronized (connectedPlayerLock)
+				try
 				{
-					shouldAcceptNewConnection = connectedPlayer == null;
+					newConnection = accepter.acceptIncoming(serverSocket);
 				}
-
-				if (newConnection != null)
+				catch (IOException e)
 				{
-					if (shouldAcceptNewConnection)
+					if (isOpen)
 					{
-						Player newPlayer = null;
-						try
-						{
-							newPlayer = lobbyAccepter.acceptConnection(newConnection);
-						}
-						catch (IOException e)
-						{
-							Log.e(TAG, String.format("Error in lobbyAccepter: %s", e.getMessage
-									()));
-
-							handleListeningError(e);
-						}
-
-						if (newPlayer != null)
-						{
-							handlePlayerJoined(newPlayer, newConnection);
-						}
-					}
-					else
-					{
-						// Lobby is full
-						newConnection.send(new JoinGameRejectedResponseMessage("Lobby is full"),
-								null);
-						newConnection.setCloseWhenEmpty(true);
+						e.printStackTrace();
 					}
 				}
-			}
-		}
 
-		private BluetoothSocket acceptBluetoothSocket()
-		{
-			BluetoothSocket socket = null;
+				HostHandshaker hostHandshaker = new HostHandshaker(newConnection, hostPlayer, game,
+						handler);
 
-			try
-			{
-				socket = serverSocket.accept();
+				hostHandshaker.waitForJoinRequest(new HostHandshakerListener());
 			}
-			catch (final IOException e)
-			{
-				Log.e(TAG, String.format("Error accepting Bluetooth socket: %s", e.getMessage()));
-				handleListeningError(e);
-			}
-
-			return socket;
-		}
-
-		private RemoteMessageConnection createRemoteMessageConnection(BluetoothSocket socket)
-		{
-			if (!isOpen || socket == null)
-			{
-				return null;
-			}
-
-			RemoteLink remoteLink;
-			try
-			{
-				remoteLink = new BluetoothRemoteLink(socket);
-			}
-			catch (IOException e)
-			{
-				Log.e(TAG, String.format("Error creating BluetoothRemoteLink: %s", e.getMessage
-						()));
-				handleListeningError(e);
-				return null;
-			}
-
-			return new RemoteMessageConnection(new FrameRemoteTransport(remoteLink, handler),
-					new KryoMessageSerializer());
 		}
 
 		public void stop()
@@ -250,7 +152,6 @@ public class HostBluetoothLobby
 			if (isOpen)
 			{
 				isOpen = false;
-				lobbyAccepter.cancelAccept();
 
 				try
 				{
@@ -262,67 +163,44 @@ public class HostBluetoothLobby
 				}
 			}
 		}
-
-		private void handlePlayerJoined(final Player newPlayer, RemoteMessageConnection connection)
-		{
-			if (isOpen)
-			{
-				synchronized (connectedPlayerLock)
-				{
-					connectedPlayer = new PlayerConnection(newPlayer, connection);
-					connectedPlayer.messageConnection.addListener(messageConnectionListener);
-					listener.onPlayerJoined(connectedPlayer);
-				}
-			}
-		}
-
-		private void handleListeningError(final IOException error)
-		{
-			if (stopHosting())
-			{
-				listener.onHostingStopped(error);
-			}
-		}
 	}
 
-	private RemoteMessageConnection.Listener messageConnectionListener = new MessageConnection
-			.Listener()
+	private class HostHandshakerListener implements HostHandshaker.Listener
 	{
 		@Override
-		public void onReceived(Message message)
+		public void onJoinRequestReceived(HostHandshaker sender)
 		{
-			if (message instanceof PlayerQuitMessage)
+			synchronized (connectedLobbyLock)
 			{
-				handlePlayerQuit();
-			}
-		}
-
-		@Override
-		public void onReceiveError(final IOException error)
-		{
-			Log.e(TAG, String.format("Error received: %s", error.getMessage()));
-			handlePlayerQuit();
-		}
-
-		@Override
-		public void onClosed()
-		{
-			Log.w(TAG, "Remote connection closed unexpectedly");
-			handlePlayerQuit();
-		}
-
-		private void handlePlayerQuit()
-		{
-			synchronized (connectedPlayerLock)
-			{
-				if (connectedPlayer != null)
+				if (connectedLobby == null)
 				{
-					Log.i(TAG,
-							String.format("Player %s has quit", connectedPlayer.player.toString
-									()));
-					clearConnectedPlayer(false);
+					sender.acceptJoinRequest();
+					Player joiningPlayer = sender.getJoiningPlayer();
+					RemoteMessageConnection messageConnection = sender.getMessageConnection();
+
+					if (joiningPlayer != null && messageConnection != null)
+					{
+						connectedLobby = new LobbyBridge(joiningPlayer, messageConnection);
+						// TODO: add listener here
+					}
+				}
+				else
+				{
+					sender.rejectJoinRequest("lobby is full");
 				}
 			}
 		}
-	};
+
+		@Override
+		public void onIoException(HostHandshaker sender, IOException error)
+		{
+			Log.e(TAG, String.format("Handshake error: %s", error.getMessage()));
+		}
+
+		@Override
+		public void onTimedOut(HostHandshaker sender)
+		{
+			Log.e(TAG, "Handshake timed out");
+		}
+	}
 }

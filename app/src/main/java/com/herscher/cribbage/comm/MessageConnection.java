@@ -26,9 +26,9 @@ public interface MessageConnection
 
 	void send(Message message, MessageSendCallback callback);
 
-	void setCloseWhenEmpty(boolean shouldClose);
-
 	boolean isOpen();
 
 	void close();
+
+	void closeImmediately();
 }
